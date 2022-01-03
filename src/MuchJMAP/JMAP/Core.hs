@@ -1,16 +1,16 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module MuchJMAP.JMAP.Types ( SessionResourceAccount(..)
-                           , SessionResource(..)
-                           , MethodCall
-                           , MethodResponse
-                           , Request(..)
-                           , Response
-                           , makeEchoMethodCall
-                           ) where
+module MuchJMAP.JMAP.Core ( SessionResourceAccount(..)
+                          , SessionResource(..)
+                          , Capability(..)
+                          , MethodCall(..)
+                          , MethodResponse(..)
+                          , Request(..)
+                          , Response(..)
+                          , aesonOptionWithLabelPrefix
+                          ) where
 
 import qualified Data.Set as Set
 import Data.List (isPrefixOf)
@@ -22,6 +22,7 @@ import GHC.Generics
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson.Types
+import Control.Monad.Catch (MonadThrow)
 
 aesonOptionWithLabelPrefix :: String -> Aeson.Options
 aesonOptionWithLabelPrefix prefix = Aeson.defaultOptions {Aeson.fieldLabelModifier = mod}
@@ -90,9 +91,6 @@ data MethodResponse = MethodResponse { methodResponseName :: String
                                      , methodResponseId :: String }
                       deriving (Show)
 
-parseMethodResponseBody :: (Aeson.FromJSON a) => MethodResponse -> Aeson.Result a
-parseMethodResponseBody resp = Aeson.Types.parse Aeson.parseJSON (methodResponseBody resp)
-
 instance Aeson.FromJSON MethodResponse where
   parseJSON s =
     convert <$> (Aeson.parseJSON s :: Aeson.Types.Parser (String, Aeson.Value, String))
@@ -106,24 +104,3 @@ data Response = Response { responseMethodResponses :: [MethodResponse]
 
 instance Aeson.FromJSON Response where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "response"
-
--- Core
-makeEchoMethodCall :: (Aeson.ToJSON args) => String -> args -> MethodCall
-makeEchoMethodCall id args = MethodCall { methodCallCapability = CoreCapability
-                                        , methodCallName = "Core/echo"
-                                        , methodCallArgs = Aeson.toJSON args
-                                        , methodCallId = id }
-
--- Mail
-
-newtype MailboxId = MailboxId String
-  deriving (Aeson.ToJSON, Aeson.FromJSON, Show)
-
-data Mailbox = Mailbox { mailboxId :: MailboxId
-                       , mailboxName :: String
-                       , mailboxParentId :: MailboxId
-                       , mailboxRole :: String }
-               deriving (Show, Generic)
-
-instance Aeson.FromJSON Mailbox where
-  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "mailbox"
