@@ -20,7 +20,13 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
-- req
+- bytestring
+- text
+- containers
+- mtl
+- exceptions
+- aeson
+- http-conduit
 
 library:
   source-dirs: src

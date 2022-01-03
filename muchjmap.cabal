@@ -23,14 +23,21 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      MuchJMAP.JMAP.Request
+      MuchJMAP.JMAP.Types
   other-modules:
       Paths_muchjmap
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
-    , req
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , exceptions
+    , http-conduit
+    , mtl
+    , text
   default-language: Haskell2010
 
 executable muchjmap-exe
@@ -41,9 +48,15 @@ executable muchjmap-exe
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , exceptions
+    , http-conduit
+    , mtl
     , muchjmap
-    , req
+    , text
   default-language: Haskell2010
 
 test-suite muchjmap-test
@@ -55,7 +68,13 @@ test-suite muchjmap-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , exceptions
+    , http-conduit
+    , mtl
     , muchjmap
-    , req
+    , text
   default-language: Haskell2010
