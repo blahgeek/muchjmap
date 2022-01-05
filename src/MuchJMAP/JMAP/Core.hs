@@ -9,14 +9,21 @@ module MuchJMAP.JMAP.Core ( SessionResourceAccount(..)
                           , MethodResponse(..)
                           , Request(..)
                           , Response(..)
+                          , CommonGetRequestArgs(..)
+                          , CommonGetResponseBody(..)
+                          , defaultCommonGetRequestArgs
                           , aesonOptionWithLabelPrefix
+                          , getPrimaryAccount
                           ) where
 
 import qualified Data.Set as Set
-import Data.List (isPrefixOf)
+import qualified Data.Text as Text
+import Data.List (isPrefixOf, find)
+import Data.Maybe (fromJust)
 import Data.Char (toLower)
 import Data.ByteString (ByteString)
-import Data.Map (Map)
+import Data.Map (Map, findWithDefault, keys)
+import Data.Functor
 import GHC.Generics
 
 import Data.Aeson ((.=))
@@ -32,6 +39,34 @@ aesonOptionWithLabelPrefix prefix = Aeson.defaultOptions {Aeson.fieldLabelModifi
 
 -- Session
 
+data Capability = CoreCapability | MailCapability | CustomCapability String
+  deriving (Show, Eq)
+
+capabilityNames :: [(String, Capability)]
+capabilityNames = [("urn:ietf:params:jmap:core", CoreCapability),
+                   ("urn:ietf:params:jmap:mail", MailCapability)]
+
+toString :: Capability -> String
+toString (CustomCapability s) = s
+toString c = fst $ fromJust $ find (\x -> c == snd x) capabilityNames
+
+fromString :: String -> Capability
+fromString s = case lookup s capabilityNames of Just c -> c
+                                                Nothing -> CustomCapability s
+
+instance Aeson.ToJSON Capability where
+  toJSON c = Aeson.toJSON $ toString c
+
+instance Aeson.FromJSON Capability where
+  parseJSON v = (Aeson.parseJSON v :: Aeson.Types.Parser String) <&> fromString
+
+instance Aeson.FromJSONKey Capability where
+  fromJSONKey = Aeson.FromJSONKeyText convert
+    where convert text = fromString (Text.unpack text)
+
+instance Ord Capability where
+  (<=) a b = toString a <= toString b
+
 data SessionResourceAccount = SessionResourceAccount { accountName :: String
                                                      , accountUserId :: String}
                               deriving (Show, Generic)
@@ -42,31 +77,20 @@ instance Aeson.FromJSON SessionResourceAccount where
 data SessionResource = SessionResource { sessionAccounts :: Map String SessionResourceAccount
                                        , sessionApiUrl :: String
                                        , sessionDownloadUrl :: String
-                                       , sessionUsername :: String}
+                                       , sessionUsername :: String
+                                       , sessionPrimaryAccounts :: Map Capability String
+                                       }
                        deriving (Show, Generic)
 
 instance Aeson.FromJSON SessionResource where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "session"
 
 
+getPrimaryAccount :: SessionResource -> Capability -> String
+getPrimaryAccount session c =
+  findWithDefault ((head . keys . sessionAccounts) session) c (sessionPrimaryAccounts session)
+
 -- Request & Response
-
-data Capability = CoreCapability | MailCapability | CustomCapability String
-  deriving (Show)
-
-toString :: Capability -> String
-toString CoreCapability = "urn:ietf:params:jmap:core"
-toString MailCapability = "urn:ietf:params:jmap:mail"
-toString (CustomCapability s) = s
-
-instance Aeson.ToJSON Capability where
-  toJSON c = Aeson.toJSON $ toString c
-
-instance Eq Capability where
-  (==) a b = toString a == toString b
-
-instance Ord Capability where
-  (<=) a b = toString a <= toString b
 
 data MethodCall = MethodCall { methodCallCapability :: Capability
                              , methodCallName :: String
@@ -104,3 +128,25 @@ data Response = Response { responseMethodResponses :: [MethodResponse]
 
 instance Aeson.FromJSON Response where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "response"
+
+
+data CommonGetRequestArgs = CommonGetRequestArgs{ getRequestAccountId :: String
+                                                , getRequestIds :: Maybe [String]
+                                                , getRequestProperties :: Maybe [String]}
+                            deriving (Show, Generic)
+
+defaultCommonGetRequestArgs = CommonGetRequestArgs{ getRequestAccountId = ""
+                                                  , getRequestIds = Nothing
+                                                  , getRequestProperties = Nothing}
+
+instance Aeson.ToJSON CommonGetRequestArgs where
+  toJSON = Aeson.genericToJSON $ aesonOptionWithLabelPrefix "getRequest"
+
+data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: String
+                                                    , getResponseState :: String
+                                                    , getResponseList :: [a]
+                                                    , getResponseNotFound :: [String]}
+                               deriving (Show, Generic)
+
+instance (Aeson.FromJSON a) => Aeson.FromJSON (CommonGetResponseBody a) where
+  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "getResponse"
