@@ -7,6 +7,7 @@ module MuchJMAP.JMAP.Mail where
 import GHC.Generics
 import qualified Data.Aeson as Aeson
 import Data.Char (toLower)
+import qualified Data.Map as Map
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Catch (MonadThrow)
 
@@ -15,9 +16,11 @@ import MuchJMAP.JMAP.Core ( aesonOptionWithLabelPrefix
                           , MethodCall(..)
                           , Capability(..)
                           , Request(..)
-                          , CommonGetRequestArgs(..)
+                          , MethodCallArg(..)
+                          , methodCallArgFrom
+                          , MethodCallArgs(..)
                           , CommonGetResponseBody(..)
-                          , defaultCommonGetRequestArgs)
+                          , methodCallArgsFrom)
 import MuchJMAP.JMAP.API ( RequestContext
                          , apiRequest
                          , parseResponseBody0)
@@ -55,11 +58,11 @@ instance Aeson.FromJSON Mailbox where
 getAllMailbox :: (MonadIO m, MonadThrow m) => RequestContext -> m [Mailbox]
 getAllMailbox (config, session) = do
   api_response <- apiRequest (config, session) (Request [req])
-  method_response <- parseResponseBody0 "id0" api_response
+  method_response <- parseResponseBody0 "call0" api_response
   return $ getResponseList method_response
-  where req = MethodCall {
-          methodCallCapability = MailCapability
-        , methodCallName = "Mailbox/get"
-        , methodCallId = "id0"
-        , methodCallArgs = Aeson.toJSON defaultCommonGetRequestArgs{
-            getRequestAccountId=getPrimaryAccount session MailCapability}}
+  where req = MethodCall { methodCallCapability = MailCapability
+                         , methodCallName = "Mailbox/get"
+                         , methodCallId = "call0"
+                         , methodCallArgs = args }
+        args = methodCallArgsFrom
+          [("accountId", methodCallArgFrom $ getPrimaryAccount session MailCapability)]

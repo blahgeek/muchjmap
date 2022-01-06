@@ -5,13 +5,15 @@
 module MuchJMAP.JMAP.Core ( SessionResourceAccount(..)
                           , SessionResource(..)
                           , Capability(..)
+                          , MethodCallArg(..)
+                          , methodCallArgFrom
+                          , MethodCallArgs(..)
+                          , methodCallArgsFrom
                           , MethodCall(..)
                           , MethodResponse(..)
                           , Request(..)
                           , Response(..)
-                          , CommonGetRequestArgs(..)
                           , CommonGetResponseBody(..)
-                          , defaultCommonGetRequestArgs
                           , aesonOptionWithLabelPrefix
                           , getPrimaryAccount
                           ) where
@@ -22,7 +24,7 @@ import Data.List (isPrefixOf, find)
 import Data.Maybe (fromJust)
 import Data.Char (toLower)
 import Data.ByteString (ByteString)
-import Data.Map (Map, findWithDefault, keys)
+import Data.Map (Map, findWithDefault, keys, toList, fromList)
 import Data.Functor
 import GHC.Generics
 
@@ -92,11 +94,32 @@ getPrimaryAccount session c =
 
 -- Request & Response
 
+data MethodCallArg = MethodCallArg Aeson.Value |
+                     ResultReference MethodCall String  -- path
+                     deriving (Show)
+
+newtype MethodCallArgs = MethodCallArgs (Map String MethodCallArg)
+                         deriving (Show)
+
+methodCallArgsFrom x = MethodCallArgs (fromList x)
+
 data MethodCall = MethodCall { methodCallCapability :: Capability
                              , methodCallName :: String
-                             , methodCallArgs :: Aeson.Value
+                             , methodCallArgs :: MethodCallArgs
                              , methodCallId :: String }
                   deriving (Show)
+
+methodCallArgFrom :: (Aeson.ToJSON a) => a -> MethodCallArg
+methodCallArgFrom x = MethodCallArg $ Aeson.toJSON x
+
+instance Aeson.ToJSON MethodCallArgs where
+  toJSON (MethodCallArgs m) =
+    Aeson.object $ map toEntry (toList m)
+    where toEntry (key, MethodCallArg val) = Text.pack key .= val
+          toEntry (key, ResultReference call path) =
+            Text.pack ('#' : key) .= Aeson.object [ "resultOf" .= methodCallId call
+                                                  , "name" .= methodCallName call
+                                                  , "path" .= path]
 
 instance Aeson.ToJSON MethodCall where
   toJSON MethodCall{methodCallCapability=_, methodCallName=name, methodCallArgs=args, methodCallId=id} =
@@ -129,18 +152,6 @@ data Response = Response { responseMethodResponses :: [MethodResponse]
 instance Aeson.FromJSON Response where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "response"
 
-
-data CommonGetRequestArgs = CommonGetRequestArgs{ getRequestAccountId :: String
-                                                , getRequestIds :: Maybe [String]
-                                                , getRequestProperties :: Maybe [String]}
-                            deriving (Show, Generic)
-
-defaultCommonGetRequestArgs = CommonGetRequestArgs{ getRequestAccountId = ""
-                                                  , getRequestIds = Nothing
-                                                  , getRequestProperties = Nothing}
-
-instance Aeson.ToJSON CommonGetRequestArgs where
-  toJSON = Aeson.genericToJSON $ aesonOptionWithLabelPrefix "getRequest"
 
 data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: String
                                                     , getResponseState :: String
