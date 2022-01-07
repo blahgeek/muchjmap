@@ -15,6 +15,7 @@ module MuchJMAP.JMAP.Core ( SessionResourceAccount(..)
                           , Response(..)
                           , CommonGetResponseBody(..)
                           , aesonOptionWithLabelPrefix
+                          , fieldLabels
                           , getPrimaryAccount
                           ) where
 
@@ -26,6 +27,7 @@ import Data.Char (toLower)
 import Data.ByteString (ByteString)
 import Data.Map (Map, findWithDefault, keys, toList, fromList)
 import Data.Functor
+import Data.Data
 import GHC.Generics
 
 import Data.Aeson ((.=))
@@ -33,11 +35,21 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson.Types
 import Control.Monad.Catch (MonadThrow)
 
-aesonOptionWithLabelPrefix :: String -> Aeson.Options
-aesonOptionWithLabelPrefix prefix = Aeson.defaultOptions {Aeson.fieldLabelModifier = mod}
-  where mod name = if prefix `isPrefixOf` name then lowerFirst $ drop (length prefix) name else name
-        lowerFirst [] = []
+-- simple helpers
+
+dropAndLowerFirst :: String -> String -> String
+dropAndLowerFirst prefix name =
+  if prefix `isPrefixOf` name then lowerFirst $ drop (length prefix) name else name
+  where lowerFirst [] = []
         lowerFirst (s:xs) = toLower s : xs
+
+aesonOptionWithLabelPrefix :: String -> Aeson.Options
+aesonOptionWithLabelPrefix prefix = Aeson.defaultOptions {Aeson.fieldLabelModifier = dropAndLowerFirst prefix}
+
+fieldLabels :: (Data a) => String -> a -> [String]  -- return field labels but remove prefix
+fieldLabels prefix a =
+  let constr_fields = map constrFields . dataTypeConstrs . dataTypeOf $ a in
+    map (dropAndLowerFirst prefix) (head constr_fields)
 
 -- Session
 
