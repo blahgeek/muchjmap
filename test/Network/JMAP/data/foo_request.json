@@ -1,0 +1,12 @@
+[[ "Foo/changes", {
+    "accountId": "A1",
+    "sinceState": "abcdef"
+}, "t0" ],
+[ "Foo/get", {
+    "accountId": "A1",
+    "#ids": {
+        "resultOf": "t0",
+        "name": "Foo/changes",
+        "path": "/created"
+    }
+}, "t1" ]]

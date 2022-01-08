@@ -32,11 +32,14 @@ library
   hs-source-dirs:
       src
   build-depends:
-      aeson
+      QuickCheck
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
     , exceptions
+    , file-embed
+    , hspec
     , http-conduit
     , mtl
     , text
@@ -50,11 +53,14 @@ executable muchjmap-exe
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
+      QuickCheck
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
     , exceptions
+    , file-embed
+    , hspec
     , http-conduit
     , mtl
     , muchjmap
@@ -65,16 +71,20 @@ test-suite muchjmap-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Network.JMAP.CoreSpec
       Paths_muchjmap
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      aeson
+      QuickCheck
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , containers
     , exceptions
+    , file-embed
+    , hspec
     , http-conduit
     , mtl
     , muchjmap

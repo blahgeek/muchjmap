@@ -81,9 +81,8 @@ instance Aeson.FromJSONKey Capability where
 instance Ord Capability where
   (<=) a b = toString a <= toString b
 
-data SessionResourceAccount = SessionResourceAccount { accountName :: String
-                                                     , accountUserId :: String}
-                              deriving (Show, Generic)
+data SessionResourceAccount = SessionResourceAccount { accountName :: String}
+                              deriving (Show, Generic, Eq)
 
 instance Aeson.FromJSON SessionResourceAccount where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "account"
@@ -94,7 +93,7 @@ data SessionResource = SessionResource { sessionAccounts :: Map String SessionRe
                                        , sessionUsername :: String
                                        , sessionPrimaryAccounts :: Map Capability String
                                        }
-                       deriving (Show, Generic)
+                       deriving (Show, Generic, Eq)
 
 instance Aeson.FromJSON SessionResource where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "session"
@@ -110,6 +109,9 @@ data MethodCallArg = MethodCallArg Aeson.Value |
                      ResultReference MethodCall String  -- path
                      deriving (Show)
 
+methodCallArgFrom :: (Aeson.ToJSON a) => a -> MethodCallArg
+methodCallArgFrom x = MethodCallArg $ Aeson.toJSON x
+
 newtype MethodCallArgs = MethodCallArgs (Map String MethodCallArg)
                          deriving (Show)
 
@@ -120,9 +122,6 @@ data MethodCall = MethodCall { methodCallCapability :: Capability
                              , methodCallArgs :: MethodCallArgs
                              , methodCallId :: String }
                   deriving (Show)
-
-methodCallArgFrom :: (Aeson.ToJSON a) => a -> MethodCallArg
-methodCallArgFrom x = MethodCallArg $ Aeson.toJSON x
 
 instance Aeson.ToJSON MethodCallArgs where
   toJSON (MethodCallArgs m) =
