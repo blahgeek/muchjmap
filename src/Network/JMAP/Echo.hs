@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module MuchJMAP.JMAP.Echo ( echo
+module Network.JMAP.Echo ( echo
                           ) where
 
 import Control.Monad.Catch (MonadThrow)
@@ -10,7 +10,7 @@ import GHC.Generics
 
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import MuchJMAP.JMAP.Core ( MethodResponse(..)
+import Network.JMAP.Core ( MethodResponse(..)
                           , MethodCall(..)
                           , Request(..)
                           , Response(..)
@@ -20,7 +20,7 @@ import MuchJMAP.JMAP.Core ( MethodResponse(..)
                           , methodCallArgFrom
                           , MethodCallArg (ResultReference)
                           )
-import MuchJMAP.JMAP.API ( RequestContext
+import Network.JMAP.API ( RequestContext
                          , apiRequest
                          , parseResponseBody0)
 

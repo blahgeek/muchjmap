@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module MuchJMAP.JMAP.API ( Config(..)
+module Network.JMAP.API ( Config(..)
                          , getSessionResource
                          , apiRequest
                          , parseResponseBody
@@ -19,7 +19,7 @@ import Control.Monad.Catch
 import qualified Network.HTTP.Simple as HTTP
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson.Types
-import MuchJMAP.JMAP.Core ( SessionResource (sessionApiUrl)
+import Network.JMAP.Core ( SessionResource (sessionApiUrl)
                           , MethodResponse(..)
                           , Request(..)
                           , Response(..)

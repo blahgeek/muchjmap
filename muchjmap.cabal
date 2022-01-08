@@ -23,10 +23,10 @@ source-repository head
 
 library
   exposed-modules:
-      MuchJMAP.JMAP.API
-      MuchJMAP.JMAP.Core
-      MuchJMAP.JMAP.Echo
-      MuchJMAP.JMAP.Mail
+      Network.JMAP.API
+      Network.JMAP.Core
+      Network.JMAP.Echo
+      Network.JMAP.Mail
   other-modules:
       Paths_muchjmap
   hs-source-dirs:

@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module MuchJMAP.JMAP.Mail where
+module Network.JMAP.Mail where
 
 import GHC.Generics
 import qualified Data.Aeson as Aeson
@@ -14,7 +14,7 @@ import Data.Data (Data)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Catch (MonadThrow)
 
-import MuchJMAP.JMAP.Core ( aesonOptionWithLabelPrefix
+import Network.JMAP.Core ( aesonOptionWithLabelPrefix
                           , fieldLabels
                           , getPrimaryAccount
                           , MethodCall(..)
@@ -26,7 +26,7 @@ import MuchJMAP.JMAP.Core ( aesonOptionWithLabelPrefix
                           , MethodCallArgs(..)
                           , CommonGetResponseBody(..)
                           , methodCallArgsFrom)
-import MuchJMAP.JMAP.API ( RequestContext
+import Network.JMAP.API ( RequestContext
                          , apiRequest
                          , parseResponseBody0)
 

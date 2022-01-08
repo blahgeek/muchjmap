@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module MuchJMAP.JMAP.Core ( SessionResourceAccount(..)
+module Network.JMAP.Core ( SessionResourceAccount(..)
                           , SessionResource(..)
                           , Capability(..)
                           , MethodCallArg(..)
