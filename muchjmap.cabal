@@ -37,6 +37,7 @@ library
     , aeson
     , base >=4.7 && <5
     , bytestring
+    , cmdargs
     , containers
     , exceptions
     , file-embed
@@ -58,6 +59,7 @@ executable muchjmap-exe
     , aeson
     , base >=4.7 && <5
     , bytestring
+    , cmdargs
     , containers
     , exceptions
     , file-embed
@@ -82,6 +84,7 @@ test-suite muchjmap-test
     , aeson
     , base >=4.7 && <5
     , bytestring
+    , cmdargs
     , containers
     , exceptions
     , file-embed

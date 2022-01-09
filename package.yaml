@@ -30,6 +30,7 @@ dependencies:
 - hspec
 - QuickCheck
 - file-embed
+- cmdargs
 
 library:
   source-dirs: src
