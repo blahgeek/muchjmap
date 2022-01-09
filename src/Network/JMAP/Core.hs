@@ -17,6 +17,9 @@ module Network.JMAP.Core ( SessionResourceAccount(..)
                           , aesonOptionWithLabelPrefix
                           , fieldLabels
                           , getPrimaryAccount
+                          , methodCallResponse
+                          , methodCallResponse'
+                          , MethodCallError(..)
                           ) where
 
 import qualified Data.Set as Set
@@ -163,6 +166,41 @@ data Response = Response { responseMethodResponses :: [MethodResponse]
 instance Aeson.FromJSON Response where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "response"
 
+
+-- parse response
+
+data MethodCallError = ParseBodyError Aeson.Value |
+                       MethodCallResponseNoIndexError Int |
+                       MethodCallError Aeson.Value
+  deriving (Show, Eq)
+
+methodCallResponse ::
+  Aeson.FromJSON a =>
+  Int ->     -- idx of response with same id
+  String ->  -- id
+  Response ->
+  Either MethodCallError a
+methodCallResponse i id response
+  | i >= length matched = Left $ MethodCallResponseNoIndexError i
+  | methodResponseName (matched !! i) == "error" =
+    Left $ MethodCallError $ methodResponseBody (matched !! i)
+  | otherwise =
+    let body = methodResponseBody (matched !! i) in
+      case Aeson.Types.parse Aeson.parseJSON body of
+        (Aeson.Success val) -> Right val
+        (Aeson.Error _) -> Left $ ParseBodyError body
+  where matched = filter
+          (\method_response -> methodResponseId method_response == id)
+          (responseMethodResponses response)
+
+methodCallResponse' ::
+  (Aeson.FromJSON a) =>
+  String ->  -- id
+  Response ->
+  Either MethodCallError a
+methodCallResponse' = methodCallResponse 0
+
+-- some common response data
 
 data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: String
                                                     , getResponseState :: String

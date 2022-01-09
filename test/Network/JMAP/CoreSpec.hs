@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Network.JMAP.CoreSpec where
 
@@ -12,12 +13,21 @@ import qualified Data.ByteString.Lazy.Char8 as C
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import Data.FileEmbed
+import GHC.Generics
 
 import Network.JMAP.Core
+import Data.Either
 
 data TestData = TestData { testHello :: String
                          , testWorldXyz :: Int }
                 deriving (Show, Data)
+
+data TestCallResponse = TestCallResponse { arg1 :: Int
+                                         , arg2 :: String}
+                        deriving (Show, Generic)
+
+instance Aeson.FromJSON TestCallResponse
+
 
 spec :: Spec
 spec = do
@@ -67,3 +77,23 @@ spec = do
       Aeson.toJSON request `shouldBe` Aeson.object [ "using" .= (["urn:ietf:params:jmap:core"] :: [String])
                                                    , "methodCalls" .= request_value]
 
+  describe "response data" $ do
+    let response_json_str = C.fromStrict $(embedFile "test/Network/JMAP/data/foo_response.json")
+        response = Aeson.decode response_json_str :: Maybe Response
+    it "should contains state and method responses" $ do
+      responseSessionState (fromJust response) `shouldBe` "75128aab4b1b"
+      length (responseMethodResponses (fromJust response)) `shouldBe` 4
+    it "should parse method call response c1" $ do
+      let call_response = methodCallResponse' "c1" (fromJust response)
+      arg1 <$> call_response `shouldBe` Right 3
+      arg2 <$> call_response `shouldBe` Right "foo"
+    it "should parse method call response c2" $ do
+      methodCallResponse' "c2" (fromJust response) `shouldBe`
+        Right (Aeson.object ["isBlah" .= True])
+    it "should parse method call response c2 second" $ do
+      methodCallResponse 1 "c2" (fromJust response) `shouldBe`
+        Right (Aeson.object [ "data" .= (10 :: Int)
+                            , "yetmoredata" .= ("Hello" :: String)])
+    it "should parse method call response c3 error" $ do
+      (methodCallResponse' "c3" (fromJust response) :: Either MethodCallError Aeson.Value)
+        `shouldSatisfy` isLeft

@@ -7,6 +7,7 @@ module Network.JMAP.Echo ( echo
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class
 import GHC.Generics
+import Data.Either
 
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -19,10 +20,10 @@ import Network.JMAP.Core ( MethodResponse(..)
                           , methodCallArgsFrom
                           , methodCallArgFrom
                           , MethodCallArg (ResultReference)
+                          , methodCallResponse'
                           )
 import Network.JMAP.API ( RequestContext
-                         , apiRequest
-                         , parseResponseBody0)
+                         , apiRequest)
 
 -- Core/echo
 makeEchoMethodCall :: String -> MethodCallArgs -> MethodCall
@@ -40,8 +41,9 @@ echo :: (MonadIO m, MonadThrow m) => RequestContext -> String -> m String
 echo context msg = do
   response <- apiRequest context (Request [call0, call1])
   liftIO $ print response
-  body <- parseResponseBody0 "call1" response
-  return $ echoMessage body
+  case methodCallResponse' "call1" response of
+    Left _ -> return ""
+    Right body -> return $ echoMessage body
   where call0 = makeEchoMethodCall "call0" $ methodCallArgsFrom
                         [("arg0", methodCallArgFrom msg)]
         call1 = makeEchoMethodCall "call1" $ methodCallArgsFrom
