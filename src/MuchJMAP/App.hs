@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module MuchJMAP.App where
 
 import Control.Monad.IO.Class (MonadIO)

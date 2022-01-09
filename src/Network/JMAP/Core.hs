@@ -23,7 +23,7 @@ module Network.JMAP.Core ( SessionResourceAccount(..)
                           ) where
 
 import qualified Data.Set as Set
-import qualified Data.Text as Text
+import qualified Data.Text as T
 import Data.List (isPrefixOf, find)
 import Data.Maybe (fromJust)
 import Data.Char (toLower)
@@ -56,45 +56,44 @@ fieldLabels prefix a =
 
 -- Session
 
-data Capability = CoreCapability | MailCapability | CustomCapability String
+data Capability = CoreCapability | MailCapability | CustomCapability T.Text
   deriving (Show, Eq)
 
-capabilityNames :: [(String, Capability)]
+capabilityNames :: [(T.Text, Capability)]
 capabilityNames = [("urn:ietf:params:jmap:core", CoreCapability),
                    ("urn:ietf:params:jmap:mail", MailCapability)]
 
-toString :: Capability -> String
-toString (CustomCapability s) = s
-toString c = fst $ fromJust $ find (\x -> c == snd x) capabilityNames
+capabilityName :: Capability -> T.Text
+capabilityName (CustomCapability s) = s
+capabilityName c = fst $ fromJust $ find (\x -> c == snd x) capabilityNames
 
-fromString :: String -> Capability
-fromString s = case lookup s capabilityNames of Just c -> c
-                                                Nothing -> CustomCapability s
+fromCapabilityName :: T.Text -> Capability
+fromCapabilityName s = case lookup s capabilityNames of Just c -> c
+                                                        Nothing -> CustomCapability s
 
 instance Aeson.ToJSON Capability where
-  toJSON c = Aeson.toJSON $ toString c
+  toJSON c = Aeson.toJSON $ capabilityName c
 
 instance Aeson.FromJSON Capability where
-  parseJSON v = (Aeson.parseJSON v :: Aeson.Types.Parser String) <&> fromString
+  parseJSON v = Aeson.parseJSON v <&> fromCapabilityName
 
 instance Aeson.FromJSONKey Capability where
-  fromJSONKey = Aeson.FromJSONKeyText convert
-    where convert text = fromString (Text.unpack text)
+  fromJSONKey = Aeson.FromJSONKeyText fromCapabilityName
 
 instance Ord Capability where
-  (<=) a b = toString a <= toString b
+  (<=) a b = capabilityName a <= capabilityName b
 
-data SessionResourceAccount = SessionResourceAccount { accountName :: String}
+data SessionResourceAccount = SessionResourceAccount { accountName :: T.Text}
                               deriving (Show, Generic, Eq)
 
 instance Aeson.FromJSON SessionResourceAccount where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "account"
 
-data SessionResource = SessionResource { sessionAccounts :: Map String SessionResourceAccount
-                                       , sessionApiUrl :: String
-                                       , sessionDownloadUrl :: String
-                                       , sessionUsername :: String
-                                       , sessionPrimaryAccounts :: Map Capability String
+data SessionResource = SessionResource { sessionAccounts :: Map T.Text SessionResourceAccount
+                                       , sessionApiUrl :: T.Text
+                                       , sessionDownloadUrl :: T.Text
+                                       , sessionUsername :: T.Text
+                                       , sessionPrimaryAccounts :: Map Capability T.Text
                                        }
                        deriving (Show, Generic, Eq)
 
@@ -102,38 +101,38 @@ instance Aeson.FromJSON SessionResource where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "session"
 
 
-getPrimaryAccount :: SessionResource -> Capability -> String
+getPrimaryAccount :: SessionResource -> Capability -> T.Text
 getPrimaryAccount session c =
   findWithDefault ((head . keys . sessionAccounts) session) c (sessionPrimaryAccounts session)
 
 -- Request & Response
 
 data MethodCallArg = MethodCallArg Aeson.Value |
-                     ResultReference MethodCall String  -- path
+                     ResultReference MethodCall T.Text  -- path
                      deriving (Show)
 
 methodCallArgFrom :: (Aeson.ToJSON a) => a -> MethodCallArg
 methodCallArgFrom x = MethodCallArg $ Aeson.toJSON x
 
-newtype MethodCallArgs = MethodCallArgs (Map String MethodCallArg)
+newtype MethodCallArgs = MethodCallArgs (Map T.Text MethodCallArg)
                          deriving (Show)
 
 methodCallArgsFrom x = MethodCallArgs (fromList x)
 
 data MethodCall = MethodCall { methodCallCapability :: Capability
-                             , methodCallName :: String
+                             , methodCallName :: T.Text
                              , methodCallArgs :: MethodCallArgs
-                             , methodCallId :: String }
+                             , methodCallId :: T.Text }
                   deriving (Show)
 
 instance Aeson.ToJSON MethodCallArgs where
   toJSON (MethodCallArgs m) =
     Aeson.object $ map toEntry (toList m)
-    where toEntry (key, MethodCallArg val) = Text.pack key .= val
+    where toEntry (key, MethodCallArg val) = key .= val
           toEntry (key, ResultReference call path) =
-            Text.pack ('#' : key) .= Aeson.object [ "resultOf" .= methodCallId call
-                                                  , "name" .= methodCallName call
-                                                  , "path" .= path]
+            T.cons '#' key .= Aeson.object [ "resultOf" .= methodCallId call
+                                           , "name" .= methodCallName call
+                                           , "path" .= path]
 
 instance Aeson.ToJSON MethodCall where
   toJSON MethodCall{methodCallCapability=_, methodCallName=name, methodCallArgs=args, methodCallId=id} =
@@ -147,20 +146,20 @@ instance Aeson.ToJSON Request where
                   "methodCalls" .= calls]
     where capabilities = Set.toList $ Set.fromList $ map methodCallCapability calls
 
-data MethodResponse = MethodResponse { methodResponseName :: String
+data MethodResponse = MethodResponse { methodResponseName :: T.Text
                                      , methodResponseBody :: Aeson.Value
-                                     , methodResponseId :: String }
+                                     , methodResponseId :: T.Text }
                       deriving (Show)
 
 instance Aeson.FromJSON MethodResponse where
   parseJSON s =
-    convert <$> (Aeson.parseJSON s :: Aeson.Types.Parser (String, Aeson.Value, String))
+    convert <$> (Aeson.parseJSON s :: Aeson.Types.Parser (T.Text, Aeson.Value, T.Text))
     where convert (name, body, id) = MethodResponse{ methodResponseName = name
                                                    , methodResponseBody = body
                                                    , methodResponseId = id}
 
 data Response = Response { responseMethodResponses :: [MethodResponse]
-                         , responseSessionState :: String }
+                         , responseSessionState :: T.Text }
                    deriving (Show, Generic)
 
 instance Aeson.FromJSON Response where
@@ -177,7 +176,7 @@ data MethodCallError = ParseBodyError Aeson.Value |
 methodCallResponse ::
   Aeson.FromJSON a =>
   Int ->     -- idx of response with same id
-  String ->  -- id
+  T.Text ->  -- id
   Response ->
   Either MethodCallError a
 methodCallResponse i id response
@@ -195,17 +194,17 @@ methodCallResponse i id response
 
 methodCallResponse' ::
   (Aeson.FromJSON a) =>
-  String ->  -- id
+  T.Text ->  -- id
   Response ->
   Either MethodCallError a
 methodCallResponse' = methodCallResponse 0
 
 -- some common response data
 
-data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: String
-                                                    , getResponseState :: String
+data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: T.Text
+                                                    , getResponseState :: T.Text
                                                     , getResponseList :: [a]
-                                                    , getResponseNotFound :: [String]}
+                                                    , getResponseNotFound :: [T.Text]}
                                deriving (Show, Generic)
 
 instance (Aeson.FromJSON a) => Aeson.FromJSON (CommonGetResponseBody a) where

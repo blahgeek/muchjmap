@@ -9,7 +9,7 @@ import GHC.Generics
 import qualified Data.Aeson as Aeson
 import Data.Char (toLower)
 import qualified Data.Map as Map
-import qualified Data.Text as Text
+import qualified Data.Text as T
 import Data.Data (Data)
 
 import Network.JMAP.Core ( aesonOptionWithLabelPrefix
@@ -25,7 +25,7 @@ import Network.JMAP.Core ( aesonOptionWithLabelPrefix
                           , CommonGetResponseBody(..)
                           , methodCallArgsFrom)
 
-newtype MailboxId = MailboxId String
+newtype MailboxId = MailboxId T.Text
   deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Aeson.FromJSONKey, Eq, Data)
 
 instance Ord MailboxId where
@@ -42,7 +42,7 @@ instance Aeson.FromJSON WellknownMailboxRole where
                         Aeson.constructorTagModifier =
                           map toLower . drop 4}  -- "Role"
 
-data MailboxRole = WellknownRole WellknownMailboxRole | UnknownRole String
+data MailboxRole = WellknownRole WellknownMailboxRole | UnknownRole T.Text
   deriving (Show, Generic, Data)
 
 instance Aeson.FromJSON MailboxRole where
@@ -50,7 +50,7 @@ instance Aeson.FromJSON MailboxRole where
                 Aeson.defaultOptions{Aeson.sumEncoding = Aeson.UntaggedValue}
 
 data Mailbox = Mailbox { mailboxId :: MailboxId
-                       , mailboxName :: String
+                       , mailboxName :: T.Text
                        , mailboxParentId :: Maybe MailboxId
                        , mailboxRole :: Maybe MailboxRole }
                deriving (Show, Generic, Data)
@@ -59,7 +59,7 @@ instance Aeson.FromJSON Mailbox where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "mailbox"
 
 
-makeGetMailboxMethodCall :: String -> [(String, MethodCallArg)] -> MethodCall
+makeGetMailboxMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
 makeGetMailboxMethodCall id args =
   MethodCall { methodCallCapability = MailCapability
              , methodCallName = "Mailbox/get"
@@ -69,24 +69,24 @@ makeGetMailboxMethodCall id args =
           ("properties", methodCallArgFrom $ fieldLabels "mailbox" (undefined :: Mailbox)) : args
 
 
-newtype EmailId = EmailId String
+newtype EmailId = EmailId T.Text
   deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Data)
 
-newtype BlobId = BlobId String
+newtype BlobId = BlobId T.Text
   deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Data)
 
 data Email = Email { emailId :: EmailId
                    , emailBlobId :: BlobId
                    , emailMailboxIds :: Map.Map MailboxId Bool
-                   , emailKeywords :: Map.Map String Bool  -- TODO
+                   , emailKeywords :: Map.Map T.Text Bool  -- TODO
                    , emailSize :: Int
-                   , emailSubject :: Text.Text}
+                   , emailSubject :: T.Text}
              deriving (Show, Generic, Data)
 
 instance Aeson.FromJSON Email where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "email"
 
-makeGetEmailMethodCall :: String -> [(String, MethodCallArg)] -> MethodCall
+makeGetEmailMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
 makeGetEmailMethodCall id args =
   MethodCall { methodCallCapability = MailCapability
              , methodCallName = "Email/get"
@@ -95,7 +95,7 @@ makeGetEmailMethodCall id args =
   where updated_args =
           ("properties", methodCallArgFrom $ fieldLabels "email" (undefined :: Email)) : args
 
-makeQueryEmailMethodCall :: String -> [(String, MethodCallArg)] -> MethodCall
+makeQueryEmailMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
 makeQueryEmailMethodCall id args =
   MethodCall { methodCallCapability = MailCapability
              , methodCallName = "Email/query"

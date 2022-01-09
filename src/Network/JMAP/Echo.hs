@@ -8,6 +8,7 @@ import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class
 import GHC.Generics
 import Data.Either
+import qualified Data.Text as T
 
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -26,18 +27,18 @@ import Network.JMAP.API ( RequestContext
                          , apiRequest)
 
 -- Core/echo
-makeEchoMethodCall :: String -> MethodCallArgs -> MethodCall
+makeEchoMethodCall :: T.Text -> MethodCallArgs -> MethodCall
 makeEchoMethodCall id args = MethodCall { methodCallCapability = CoreCapability
                                         , methodCallName = "Core/echo"
                                         , methodCallArgs = args
                                         , methodCallId = id }
 
-newtype EchoArgs = EchoArgs { echoMessage :: String }
+newtype EchoArgs = EchoArgs { echoMessage :: T.Text }
   deriving (Show, Generic)
 
 instance Aeson.FromJSON EchoArgs
 
-echo :: (MonadIO m, MonadThrow m) => RequestContext -> String -> m String
+echo :: (MonadIO m, MonadThrow m) => RequestContext -> T.Text -> m T.Text
 echo context msg = do
   response <- apiRequest context (Request [call0, call1])
   liftIO $ print response
