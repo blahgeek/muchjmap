@@ -49,15 +49,15 @@ spec = do
     let session_context = Aeson.decode (C.fromStrict $(embedFile "test/Network/JMAP/data/session_resource.json"))
     it "should decode from json" $ do
       session_context `shouldBe`
-        Just SessionResource{ sessionAccounts = Map.fromList [ ("A13824", SessionResourceAccount{ accountName = "john@example.com"})
-                                                             , ("A97813", SessionResourceAccount{ accountName = "jane@example.com"})]
+        Just SessionResource{ sessionAccounts = Map.fromList [ (AccountId "A13824", SessionResourceAccount{ accountName = "john@example.com"})
+                                                             , (AccountId "A97813", SessionResourceAccount{ accountName = "jane@example.com"})]
                             , sessionApiUrl = "https://jmap.example.com/api/"
                             , sessionDownloadUrl =  "https://jmap.example.com/download/{accountId}/{blobId}/{name}?accept={type}"
                             , sessionUsername = "john@example.com"
-                            , sessionPrimaryAccounts = Map.fromList [ (MailCapability, "A13824")
-                                                                    , (CustomCapability "urn:ietf:params:jmap:contacts", "A13824")]}
+                            , sessionPrimaryAccounts = Map.fromList [ (MailCapability, AccountId "A13824")
+                                                                    , (CustomCapability "urn:ietf:params:jmap:contacts", AccountId "A13824")]}
     it "can get primary account" $ do
-      getPrimaryAccount (fromJust session_context) MailCapability `shouldBe` "A13824"
+      getPrimaryAccount (fromJust session_context) MailCapability `shouldBe` AccountId "A13824"
 
   describe "request data" $ do
     let request_json_str = C.fromStrict $(embedFile "test/Network/JMAP/data/foo_request.json")

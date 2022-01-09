@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Network.JMAP.Core ( SessionResourceAccount(..)
                           , SessionResource(..)
@@ -23,6 +24,8 @@ module Network.JMAP.Core ( SessionResourceAccount(..)
                           , methodCallResponse
                           , methodCallResponse'
                           , MethodCallError(..)
+                          , QueryState(..)
+                          , AccountId(..)
                           ) where
 
 import qualified Data.Set as Set
@@ -86,17 +89,20 @@ instance Aeson.FromJSONKey Capability where
 instance Ord Capability where
   (<=) a b = capabilityName a <= capabilityName b
 
+newtype AccountId = AccountId T.Text
+  deriving (Aeson.ToJSON, Aeson.FromJSON, Aeson.FromJSONKey, Eq, Ord, Show)
+
 data SessionResourceAccount = SessionResourceAccount { accountName :: T.Text}
                               deriving (Show, Generic, Eq)
 
 instance Aeson.FromJSON SessionResourceAccount where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "account"
 
-data SessionResource = SessionResource { sessionAccounts :: Map T.Text SessionResourceAccount
+data SessionResource = SessionResource { sessionAccounts :: Map AccountId SessionResourceAccount
                                        , sessionApiUrl :: T.Text
                                        , sessionDownloadUrl :: T.Text
                                        , sessionUsername :: T.Text
-                                       , sessionPrimaryAccounts :: Map Capability T.Text
+                                       , sessionPrimaryAccounts :: Map Capability AccountId
                                        }
                        deriving (Show, Generic, Eq)
 
@@ -104,7 +110,7 @@ instance Aeson.FromJSON SessionResource where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "session"
 
 
-getPrimaryAccount :: SessionResource -> Capability -> T.Text
+getPrimaryAccount :: SessionResource -> Capability -> AccountId
 getPrimaryAccount session c =
   findWithDefault ((head . keys . sessionAccounts) session) c (sessionPrimaryAccounts session)
 
@@ -230,8 +236,11 @@ instance Aeson.ToJSON SortComparator where
 
 -- some common response data
 
-data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: T.Text
-                                                    , getResponseState :: T.Text
+newtype GetState = GetState T.Text
+  deriving (Aeson.ToJSON, Aeson.FromJSON, Aeson.FromJSONKey, Eq, Ord, Show)
+
+data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: AccountId
+                                                    , getResponseState :: GetState
                                                     , getResponseList :: [a]
                                                     , getResponseNotFound :: [T.Text]}
                                deriving (Show, Generic)
@@ -239,8 +248,11 @@ data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: T.
 instance (Aeson.FromJSON a) => Aeson.FromJSON (CommonGetResponseBody a) where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "getResponse"
 
-data CommonQueryResponseBody a = CommonQueryResponseBody{ queryResponseAccountId :: T.Text
-                                                        , queryResponseQueryState :: T.Text
+newtype QueryState = QueryState T.Text
+  deriving (Aeson.ToJSON, Aeson.FromJSON, Aeson.FromJSONKey, Eq, Ord, Show)
+
+data CommonQueryResponseBody a = CommonQueryResponseBody{ queryResponseAccountId :: AccountId
+                                                        , queryResponseQueryState :: QueryState
                                                         , queryResponseCanCalculateChanges :: Bool
                                                         , queryResponsePosition :: Int
                                                         , queryResponseIds :: [a]

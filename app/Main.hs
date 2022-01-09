@@ -5,6 +5,7 @@ module Main where
 
 import qualified Network.JMAP.API as JMAPAPI
 
+import System.Log.Logger
 import System.Console.CmdArgs
 import qualified Data.ByteString.Char8 as C
 import Data.Data (Data, Typeable)
@@ -19,6 +20,7 @@ configPathArg = ConfigPath { configPath = def}
 
 main :: IO ()
 main = do
+  updateGlobalLogger "" (setLevel INFO)
   config_path <- cmdArgs configPathArg
   conf <- Aeson.decodeFileStrict' $ configPath config_path
   session <- JMAPAPI.getSessionResource (fromJust conf)
