@@ -4,13 +4,13 @@
 module Main where
 
 import qualified Network.JMAP.API as JMAPAPI
-import qualified MuchJMAP.App as App
 
 import System.Console.CmdArgs
 import qualified Data.ByteString.Char8 as C
 import Data.Data (Data, Typeable)
 import Data.Maybe
 import qualified Data.Aeson as Aeson
+import qualified MuchJMAP.App as App
 
 data ConfigPath = ConfigPath { configPath :: FilePath }
   deriving (Show, Data, Typeable)
@@ -23,5 +23,5 @@ main = do
   conf <- Aeson.decodeFileStrict' $ configPath config_path
   session <- JMAPAPI.getSessionResource (fromJust conf)
   print session
-  emails <- App.getAllEmail (fromJust conf, session)
+  emails <- App.fullQueryEmailIds (fromJust conf, session) Nothing
   print emails

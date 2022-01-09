@@ -31,28 +31,9 @@ newtype MailboxId = MailboxId T.Text
 instance Ord MailboxId where
   compare (MailboxId a) (MailboxId b) = compare a b
 
-data WellknownMailboxRole = RoleAll | RoleArchive | RoleDrafts | RoleFlagged |
-                            RoleImportant | RoleInbox | RoleJunk | RoleSent |
-                            RoleSubscribed | RoleTrash
-  deriving (Show, Generic, Data)
-
-instance Aeson.FromJSON WellknownMailboxRole where
-  parseJSON = Aeson.genericParseJSON $
-                Aeson.defaultOptions{
-                        Aeson.constructorTagModifier =
-                          map toLower . drop 4}  -- "Role"
-
-data MailboxRole = WellknownRole WellknownMailboxRole | UnknownRole T.Text
-  deriving (Show, Generic, Data)
-
-instance Aeson.FromJSON MailboxRole where
-  parseJSON = Aeson.genericParseJSON $
-                Aeson.defaultOptions{Aeson.sumEncoding = Aeson.UntaggedValue}
-
 data Mailbox = Mailbox { mailboxId :: MailboxId
                        , mailboxName :: T.Text
-                       , mailboxParentId :: Maybe MailboxId
-                       , mailboxRole :: Maybe MailboxRole }
+                       , mailboxParentId :: Maybe MailboxId }
                deriving (Show, Generic, Data)
 
 instance Aeson.FromJSON Mailbox where
@@ -75,12 +56,14 @@ newtype EmailId = EmailId T.Text
 newtype BlobId = BlobId T.Text
   deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Data)
 
+newtype EmailKeyword = EmailKeyword T.Text
+  deriving (Aeson.ToJSON, Aeson.FromJSON, Aeson.FromJSONKey, Eq, Ord, Show, Data)
+
 data Email = Email { emailId :: EmailId
                    , emailBlobId :: BlobId
                    , emailMailboxIds :: Map.Map MailboxId Bool
-                   , emailKeywords :: Map.Map T.Text Bool  -- TODO
-                   , emailSize :: Int
-                   , emailSubject :: T.Text}
+                   , emailKeywords :: Map.Map EmailKeyword Bool
+                   , emailSize :: Int }
              deriving (Show, Generic, Data)
 
 instance Aeson.FromJSON Email where
@@ -93,7 +76,9 @@ makeGetEmailMethodCall id args =
              , methodCallArgs = methodCallArgsFrom updated_args
              , methodCallId = id}
   where updated_args =
-          ("properties", methodCallArgFrom $ fieldLabels "email" (undefined :: Email)) : args
+          ("properties", methodCallArgFrom $ fieldLabels "email" (undefined :: Email)) :
+          ("bodyProperties", methodCallArgFrom ([] :: [String])) :
+          args
 
 makeQueryEmailMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
 makeQueryEmailMethodCall id args =

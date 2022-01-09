@@ -14,6 +14,9 @@ module Network.JMAP.Core ( SessionResourceAccount(..)
                           , Request(..)
                           , Response(..)
                           , CommonGetResponseBody(..)
+                          , CommonQueryResponseBody(..)
+                          , FilterCondition(..)
+                          , SortComparator(..)
                           , aesonOptionWithLabelPrefix
                           , fieldLabels
                           , getPrimaryAccount
@@ -199,6 +202,32 @@ methodCallResponse' ::
   Either MethodCallError a
 methodCallResponse' = methodCallResponse 0
 
+-- Filter & sort
+
+data FilterCondition = FilterValue Aeson.Value |
+                       FilterOpAND [FilterCondition] |
+                       FilterOpOR [FilterCondition] |
+                       FilterOpNOT [FilterCondition]
+                       deriving (Show, Eq)
+
+instance Aeson.ToJSON FilterCondition where
+  toJSON (FilterValue val) = val
+  toJSON (FilterOpAND conds) = Aeson.object [ "operator" .= ("AND" :: String)
+                                            , "conditions" .= Aeson.toJSON conds]
+  toJSON (FilterOpOR conds) = Aeson.object [ "operator" .= ("OR" :: String)
+                                           , "conditions" .= Aeson.toJSON conds]
+  toJSON (FilterOpNOT conds) = Aeson.object [ "operator" .= ("NOT" :: String)
+                                            , "conditions" .= Aeson.toJSON conds]
+
+data SortComparator = SortAscending T.Text | SortDescending T.Text
+                      deriving (Show, Eq)
+
+instance Aeson.ToJSON SortComparator where
+  toJSON (SortAscending s) = Aeson.object [ "property" .= s
+                                          , "isAscending" .= True]
+  toJSON (SortDescending s) = Aeson.object [ "property" .= s
+                                           , "isAscending" .= False]
+
 -- some common response data
 
 data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: T.Text
@@ -209,3 +238,15 @@ data CommonGetResponseBody a = CommonGetResponseBody{ getResponseAccountId :: T.
 
 instance (Aeson.FromJSON a) => Aeson.FromJSON (CommonGetResponseBody a) where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "getResponse"
+
+data CommonQueryResponseBody a = CommonQueryResponseBody{ queryResponseAccountId :: T.Text
+                                                        , queryResponseQueryState :: T.Text
+                                                        , queryResponseCanCalculateChanges :: Bool
+                                                        , queryResponsePosition :: Int
+                                                        , queryResponseIds :: [a]
+                                                        , queryResponseTotal :: Maybe Int
+                                                        , queryResponseLimit :: Maybe Int}
+                                 deriving (Show, Generic)
+
+instance (Aeson.FromJSON a) => Aeson.FromJSON (CommonQueryResponseBody a) where
+  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "queryResponse"
