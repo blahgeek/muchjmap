@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module MuchJMAP.App where
@@ -8,26 +9,33 @@ import Control.Monad.Catch (MonadThrow, throwM, Exception)
 import qualified Data.Text as T
 import Data.Maybe
 import qualified System.Log.Logger as Logger
+import Data.Aeson ((.=))
+import qualified Data.Aeson as Aeson
+import GHC.Generics
 
 import Network.JMAP.API ( RequestContext
-                         , apiRequest)
-import Network.JMAP.Mail ( Mailbox
+                        , apiRequest
+                        , ServerConfig(..))
+import Network.JMAP.Mail ( Mailbox(..)
                          , MailboxId(..)
                          , Email
                          , EmailId(..)
                          , BlobId(..)
                          , makeGetMailboxMethodCall
                          , makeGetEmailMethodCall
-                         , makeQueryEmailMethodCall)
+                         , makeQueryEmailMethodCall
+                         , findMailboxByFullName)
 import Network.JMAP.Core ( methodCallResponse'
                          , methodCallArgFrom
                          , getPrimaryAccount
+                         , aesonOptionWithLabelPrefix
                          , CommonQueryResponseBody(..)
                          , MethodCallArg(..)
                          , Capability(..)
                          , Request(..)
                          , CommonGetResponseBody(..)
-                         , QueryState)
+                         , QueryState
+                         , FilterCondition(..))
 
 infoM = Logger.infoM "App"
 warningM = Logger.warningM "App"
@@ -48,18 +56,40 @@ data JMAPException = JMAPException T.Text
 
 instance Exception JMAPException
 
+data EmailFilter = EmailFilter { emailFilterMailboxes :: Maybe [T.Text]}
+  deriving (Show, Generic)
 
-fullQueryEmailIds :: (MonadIO m, MonadThrow m) => RequestContext -> Maybe [MailboxId] -> m [EmailId]
-fullQueryEmailIds = fullQueryEmailIdsWithOffset Nothing 0
+instance Aeson.FromJSON EmailFilter where
+  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "emailFilter"
 
-fullQueryEmailIdsWithOffset :: (MonadIO m, MonadThrow m) =>
-  Maybe QueryState -> Int -> RequestContext -> Maybe [MailboxId] -> m [EmailId]
-fullQueryEmailIdsWithOffset last_state offset (config, session) mailboxes = do
+encodeEmailFilter :: [Mailbox] -> EmailFilter -> FilterCondition
+encodeEmailFilter mailboxes EmailFilter {emailFilterMailboxes=mailbox_names} =
+  FilterOpAND (op_in_mailbox mailbox_names)
+  where op_in_mailbox Nothing = []
+        op_in_mailbox (Just names) =
+          let ids = map (mailboxId . fromJust) $ filter isJust $ map (findMailboxByFullName mailboxes) names in
+            [FilterOpOR $ map (\m -> FilterValue $ Aeson.object ["inMailbox" .= m]) ids]
+
+data Config = Config { configServerConfig :: ServerConfig
+                     , configEmailFilter :: EmailFilter }
+                deriving (Show, Generic)
+
+instance Aeson.FromJSON Config where
+  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "config"
+
+data EmailIdsSyncState = EmailIdsSyncState { emailIdsQueryState :: Maybe QueryState
+                                           , emailIds :: [EmailId] }
+                         deriving (Show)
+
+queryEmailIdsFull :: (MonadIO m, MonadThrow m) =>
+  RequestContext -> FilterCondition -> m EmailIdsSyncState
+queryEmailIdsFull = queryEmailIdsFullWithOffset Nothing 0
+
+queryEmailIdsFullWithOffset :: (MonadIO m, MonadThrow m) =>
+  Maybe QueryState -> Int -> RequestContext -> FilterCondition -> m EmailIdsSyncState
+queryEmailIdsFullWithOffset last_state offset (config, session) filters = do
   liftIO $ infoM $
-    "Running full query for email IDs from " ++
-    (case mailboxes of
-       Just m -> show $ length m
-       Nothing -> "all") ++ " mailboxes, offset " ++ show offset
+    "Running full query for email IDs, offset " ++ show offset ++ ", filters: " ++ show filters
   api_response <- apiRequest (config, session) (Request [query_call])
   case methodCallResponse' "query_call" api_response of
     Left err -> do
@@ -69,22 +99,30 @@ fullQueryEmailIdsWithOffset last_state offset (config, session) mailboxes = do
   where handleResponse resp
           | isJust last_state && fromJust last_state /= queryResponseQueryState resp = do
               liftIO $ warningM "QueryState changed, start over"
-              fullQueryEmailIds (config, session) mailboxes
-          | null (queryResponseIds resp) = return []
+              queryEmailIdsFull (config, session) filters
+          | null (queryResponseIds resp) =
+            return EmailIdsSyncState{ emailIdsQueryState = Just $ queryResponseQueryState resp
+                                    , emailIds = []}
           | otherwise = do
               let result_ids = queryResponseIds resp
+              let query_state = queryResponseQueryState resp
               liftIO $ infoM $ "Server returned " ++ show (length result_ids) ++ " email IDs"
-              next_result_ids <- fullQueryEmailIdsWithOffset
-                (Just $ queryResponseQueryState resp)
-                (offset + length result_ids)
-                (config, session) mailboxes
-              return $ result_ids ++ next_result_ids
+              EmailIdsSyncState{emailIds=next_result_ids} <-
+                queryEmailIdsFullWithOffset
+                        (Just $ queryResponseQueryState resp)
+                        (offset + length result_ids)
+                        (config, session) filters
+              return EmailIdsSyncState{ emailIdsQueryState = Just query_state
+                                      , emailIds = result_ids ++ next_result_ids}
         query_call = makeQueryEmailMethodCall "query_call" call_args
         call_args =
           [ ("accountId", methodCallArgFrom $ getPrimaryAccount session MailCapability)
-          , ("position", methodCallArgFrom offset)] ++
-          case mailboxes of Just ms -> [("inMailbox", methodCallArgFrom ms)]
-                            Nothing -> []
+          , ("position", methodCallArgFrom offset)
+          , ("filter", methodCallArgFrom filters)]
+
+-- queryEmailIdsDelta :: (MonadIO m, MonadThrow m) =>
+--   RequestContext -> Maybe [MailboxId] -> EmailIdsSyncState -> m EmailIdsSyncState
+
 
 getAllEmail :: (MonadIO m, MonadThrow m) => RequestContext -> m [Email]
 getAllEmail (config, session) = do

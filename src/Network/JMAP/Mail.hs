@@ -11,6 +11,8 @@ import Data.Char (toLower)
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import Data.Data (Data)
+import Data.List (find)
+import Data.Maybe (fromJust)
 
 import Network.JMAP.Core ( aesonOptionWithLabelPrefix
                           , fieldLabels
@@ -39,6 +41,15 @@ data Mailbox = Mailbox { mailboxId :: MailboxId
 instance Aeson.FromJSON Mailbox where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "mailbox"
 
+mailboxFullName :: [Mailbox] -> Mailbox -> T.Text
+mailboxFullName mailboxes Mailbox{mailboxName=name, mailboxParentId=Nothing} = name
+mailboxFullName mailboxes Mailbox{mailboxName=name, mailboxParentId=parent_id} =
+  case find (\m -> mailboxId m == fromJust parent_id) mailboxes of
+    Nothing -> name
+    Just parent -> mailboxFullName mailboxes parent <> T.pack "/" <> name
+
+findMailboxByFullName :: [Mailbox] -> T.Text -> Maybe Mailbox
+findMailboxByFullName mailboxes name = find (\m -> mailboxFullName mailboxes m == name) mailboxes
 
 makeGetMailboxMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
 makeGetMailboxMethodCall id args =

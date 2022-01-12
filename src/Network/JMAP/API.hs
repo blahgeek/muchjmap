@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Network.JMAP.API ( Config(..)
+module Network.JMAP.API ( ServerConfig(..)
                          , getSessionResource
                          , apiRequest
                          , RequestContext
@@ -13,8 +13,10 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Functor
 import qualified Data.ByteString.Char8 as C
+import qualified Data.ByteString.Lazy.Char8 as CL
 import Control.Monad.IO.Class
 import Control.Monad.Catch
+import qualified System.Log.Logger as Logger
 import GHC.Generics
 
 import qualified Data.Aeson as Aeson
@@ -25,33 +27,41 @@ import Network.JMAP.Core ( SessionResource (sessionApiUrl)
                           , aesonOptionWithLabelPrefix
                           )
 
-data Config = Config { configEndpoint :: T.Text
-                     , configUsername :: T.Text
-                     , configPassword :: T.Text}
-              deriving (Show, Generic)
+debugM = Logger.debugM "JMAP.API"
 
-instance Aeson.FromJSON Config where
-  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "config"
+data ServerConfig = ServerConfig { serverConfigEndpoint :: T.Text,
+                                   serverConfigUsername :: T.Text,
+                                   serverConfigPassword :: T.Text }
+                  deriving (Show, Generic)
 
-getSessionResource :: (MonadIO m, MonadThrow m) => Config -> m SessionResource
+instance Aeson.FromJSON ServerConfig where
+  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "serverConfig"
+
+getSessionResource :: (MonadIO m, MonadThrow m) => ServerConfig -> m SessionResource
 getSessionResource config = (http_req >>= HTTP.httpJSON) <&> HTTP.getResponseBody
   where http_req =
-          HTTP.parseRequest (T.unpack $ configEndpoint config) <&>
-          HTTP.setRequestBasicAuth (encodeUtf8 $ configUsername config) (encodeUtf8 $ configPassword config) <&>
+          HTTP.parseRequest (T.unpack $ serverConfigEndpoint config) <&>
+          HTTP.setRequestBasicAuth
+                (encodeUtf8 $ serverConfigUsername config)
+                (encodeUtf8 $ serverConfigPassword config) <&>
           HTTP.setRequestPath (C.pack "/.well-known/jmap")
 
 -- Request API call
 
-type RequestContext = (Config, SessionResource)
+type RequestContext = (ServerConfig, SessionResource)
 
 apiRequest ::
   (MonadIO m, MonadThrow m) =>
   RequestContext ->
   Request ->
   m Response
-apiRequest (config, session) req = (http_req >>= HTTP.httpJSON) <&> HTTP.getResponseBody
+apiRequest (config, session) req = do
+  liftIO $ debugM $ "apiRequest: " ++ C.unpack (CL.toStrict (Aeson.encode req))
+  (http_req >>= HTTP.httpJSON) <&> HTTP.getResponseBody
   where http_req =
           HTTP.parseRequest (T.unpack $ sessionApiUrl session) <&>
-          HTTP.setRequestBasicAuth (encodeUtf8 $ configUsername config) (encodeUtf8 $ configPassword config) <&>
+          HTTP.setRequestBasicAuth
+                (encodeUtf8 $ serverConfigUsername config)
+                (encodeUtf8 $ serverConfigPassword config) <&>
           HTTP.setRequestMethod (C.pack "POST") <&>
           HTTP.setRequestBodyJSON req
