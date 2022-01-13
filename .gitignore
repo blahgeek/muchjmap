@@ -1,4 +1,4 @@
 .stack-work/
 *~
 .log/
-config.json
+config.yaml

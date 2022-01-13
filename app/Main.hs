@@ -10,10 +10,9 @@ import System.Console.CmdArgs
 import qualified Data.ByteString.Char8 as C
 import Data.Data (Data, Typeable)
 import Data.Maybe
-import qualified Data.Aeson as Aeson
+import qualified Data.Yaml as Yaml
 import qualified MuchJMAP.App as App
 import MuchJMAP.App (Config(..))
-import qualified MuchJMAP.App as App
 
 data ConfigPath = ConfigPath { configPath :: FilePath }
   deriving (Show, Data, Typeable)
@@ -24,8 +23,7 @@ main :: IO ()
 main = do
   updateGlobalLogger "" (setLevel DEBUG)
   config_path <- cmdArgs configPathArg
-  maybe_conf <- Aeson.decodeFileStrict' $ configPath config_path
-  let conf = fromJust maybe_conf :: App.Config
+  conf <- Yaml.decodeFileThrow $ configPath config_path
   let server_config = configServerConfig conf
   let email_filter = configEmailFilter conf
 

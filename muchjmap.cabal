@@ -46,6 +46,7 @@ library
     , http-conduit
     , mtl
     , text
+    , yaml
   default-language: Haskell2010
 
 executable muchjmap-exe
@@ -70,6 +71,7 @@ executable muchjmap-exe
     , mtl
     , muchjmap
     , text
+    , yaml
   default-language: Haskell2010
 
 test-suite muchjmap-test
@@ -96,4 +98,5 @@ test-suite muchjmap-test
     , mtl
     , muchjmap
     , text
+    , yaml
   default-language: Haskell2010

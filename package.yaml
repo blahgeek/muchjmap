@@ -32,6 +32,7 @@ dependencies:
 - file-embed
 - cmdargs
 - hslogger
+- yaml
 
 library:
   source-dirs: src
