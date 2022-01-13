@@ -38,6 +38,7 @@ library
     , base >=4.7 && <5
     , bytestring
     , cmdargs
+    , conduit
     , containers
     , exceptions
     , file-embed
@@ -62,6 +63,7 @@ executable muchjmap-exe
     , base >=4.7 && <5
     , bytestring
     , cmdargs
+    , conduit
     , containers
     , exceptions
     , file-embed
@@ -89,6 +91,7 @@ test-suite muchjmap-test
     , base >=4.7 && <5
     , bytestring
     , cmdargs
+    , conduit
     , containers
     , exceptions
     , file-embed

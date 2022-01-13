@@ -4,6 +4,8 @@
 module Main where
 
 import qualified Network.JMAP.API as JMAPAPI
+import qualified Network.JMAP.Core as JMAPCore
+import qualified Network.JMAP.Mail as JMAPMail
 
 import System.Log.Logger
 import System.Console.CmdArgs
@@ -13,6 +15,8 @@ import Data.Maybe
 import qualified Data.Yaml as Yaml
 import qualified MuchJMAP.App as App
 import MuchJMAP.App (Config(..))
+import Control.Monad (forM_)
+import Conduit (runResourceT)
 
 data ConfigPath = ConfigPath { configPath :: FilePath }
   deriving (Show, Data, Typeable)
@@ -31,5 +35,15 @@ main = do
   print session
   mailboxes <- App.getAllMailbox (server_config, session)
   print mailboxes
-  emails <- App.queryEmailIdsFull (server_config, session) (App.encodeEmailFilter mailboxes email_filter)
+  -- emails <- App.queryEmailIdsFull (server_config, session) (App.encodeEmailFilter mailboxes email_filter)
+  -- print emails
+  emails <- App.getAllEmail (server_config, session)
   print emails
+
+  forM_ emails $ \email -> do
+    runResourceT $
+      JMAPAPI.downloadBlob
+        (server_config, session)
+        (JMAPCore.getPrimaryAccount session JMAPCore.MailCapability)
+        (JMAPMail.emailBlobId email)
+        "/tmp/mail.txt"

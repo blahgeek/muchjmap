@@ -25,6 +25,7 @@ import Network.JMAP.Core ( aesonOptionWithLabelPrefix
                           , methodCallArgFrom
                           , MethodCallArgs(..)
                           , CommonGetResponseBody(..)
+                          , BlobId (BlobId)
                           , methodCallArgsFrom)
 
 newtype MailboxId = MailboxId T.Text
@@ -62,9 +63,6 @@ makeGetMailboxMethodCall id args =
 
 
 newtype EmailId = EmailId T.Text
-  deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Data)
-
-newtype BlobId = BlobId T.Text
   deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Data)
 
 newtype EmailKeyword = EmailKeyword T.Text

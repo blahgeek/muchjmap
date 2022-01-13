@@ -33,6 +33,7 @@ dependencies:
 - cmdargs
 - hslogger
 - yaml
+- conduit
 
 library:
   source-dirs: src

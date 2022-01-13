@@ -5,6 +5,7 @@
 module Network.JMAP.API ( ServerConfig(..)
                          , getSessionResource
                          , apiRequest
+                         , downloadBlob
                          , RequestContext
                          ) where
 
@@ -21,11 +22,14 @@ import GHC.Generics
 
 import qualified Data.Aeson as Aeson
 import qualified Network.HTTP.Simple as HTTP
-import Network.JMAP.Core ( SessionResource (sessionApiUrl)
+import Network.JMAP.Core ( SessionResource (sessionApiUrl, sessionDownloadUrl)
                           , Request(..)
                           , Response(..)
                           , aesonOptionWithLabelPrefix
+                          , AccountId(..)
+                          , BlobId(..)
                           )
+import Conduit (sinkFileCautious, MonadUnliftIO, MonadResource)
 
 debugM = Logger.debugM "JMAP.API"
 
@@ -65,3 +69,20 @@ apiRequest (config, session) req = do
                 (encodeUtf8 $ serverConfigPassword config) <&>
           HTTP.setRequestMethod (C.pack "POST") <&>
           HTTP.setRequestBodyJSON req
+
+
+downloadBlob :: (MonadUnliftIO m, MonadThrow m, MonadResource m) =>
+  RequestContext -> AccountId -> BlobId -> FilePath -> m ()
+downloadBlob (config, session) (AccountId account_id) (BlobId blob_id) file_path = do
+  liftIO $ debugM $ "downloadBlob: " ++ show url ++ " to " ++ file_path
+  req <- http_req
+  HTTP.httpSink req (\_ -> sinkFileCautious file_path)
+  where http_req = HTTP.parseRequest (T.unpack url) <&>
+                   HTTP.setRequestBasicAuth
+                        (encodeUtf8 $ serverConfigUsername config)
+                        (encodeUtf8 $ serverConfigPassword config)
+        url = T.replace "{accountId}" account_id .
+              T.replace "{blobId}" blob_id .
+              T.replace "{type}" "application/octet-stream" .
+              T.replace "{name}" "blob" $
+              sessionDownloadUrl session

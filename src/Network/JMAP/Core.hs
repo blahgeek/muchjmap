@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -26,6 +27,7 @@ module Network.JMAP.Core ( SessionResourceAccount(..)
                           , MethodCallError(..)
                           , QueryState(..)
                           , AccountId(..)
+                          , BlobId(..)
                           ) where
 
 import qualified Data.Set as Set
@@ -91,6 +93,9 @@ instance Ord Capability where
 
 newtype AccountId = AccountId T.Text
   deriving (Aeson.ToJSON, Aeson.FromJSON, Aeson.FromJSONKey, Eq, Ord, Show)
+
+newtype BlobId = BlobId T.Text
+  deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Data)
 
 data SessionResourceAccount = SessionResourceAccount { accountName :: T.Text}
                               deriving (Show, Generic, Eq)

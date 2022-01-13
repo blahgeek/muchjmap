@@ -20,7 +20,6 @@ import Network.JMAP.Mail ( Mailbox(..)
                          , MailboxId(..)
                          , Email
                          , EmailId(..)
-                         , BlobId(..)
                          , makeGetMailboxMethodCall
                          , makeGetEmailMethodCall
                          , makeQueryEmailMethodCall
@@ -33,6 +32,7 @@ import Network.JMAP.Core ( methodCallResponse'
                          , MethodCallArg(..)
                          , Capability(..)
                          , Request(..)
+                         , BlobId(..)
                          , CommonGetResponseBody(..)
                          , QueryState
                          , FilterCondition(..))
