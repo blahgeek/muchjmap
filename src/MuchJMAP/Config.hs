@@ -48,3 +48,6 @@ instance Aeson.FromJSON Config where
 
 syncStateFilePath :: Config -> FilePath
 syncStateFilePath _ = "/tmp/muchjmap.sync.json"
+
+emailBlobDirectoryPath :: Config -> FilePath
+emailBlobDirectoryPath _ = "/tmp/muchjmap.maildir"

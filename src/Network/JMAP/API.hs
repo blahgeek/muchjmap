@@ -19,6 +19,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import GHC.Generics
 import qualified Network.HTTP.Simple as HTTP
+import Network.HTTP.Conduit (HttpExceptionContent(..), HttpException(..))
 import Network.JMAP.Core
   ( AccountId (..),
     BlobId (..),
@@ -45,7 +46,7 @@ getSessionResource :: (MonadIO m, MonadThrow m) => ServerConfig -> m SessionReso
 getSessionResource config = (http_req >>= HTTP.httpJSON) <&> HTTP.getResponseBody
   where
     http_req =
-      HTTP.parseRequest (T.unpack $ serverConfigEndpoint config)
+      HTTP.parseRequestThrow (T.unpack $ serverConfigEndpoint config)
         <&> HTTP.setRequestBasicAuth
           (encodeUtf8 $ serverConfigUsername config)
           (encodeUtf8 $ serverConfigPassword config)
@@ -65,7 +66,7 @@ apiRequest (config, session) req = do
   (http_req >>= HTTP.httpJSON) <&> HTTP.getResponseBody
   where
     http_req =
-      HTTP.parseRequest (T.unpack $ sessionApiUrl session)
+      HTTP.parseRequestThrow (T.unpack $ sessionApiUrl session)
         <&> HTTP.setRequestBasicAuth
           (encodeUtf8 $ serverConfigUsername config)
           (encodeUtf8 $ serverConfigPassword config)
@@ -82,10 +83,13 @@ downloadBlob ::
 downloadBlob (config, session) (AccountId account_id) (BlobId blob_id) file_path = do
   liftIO $ debugM $ "downloadBlob: " ++ show url ++ " to " ++ file_path
   req <- http_req
-  HTTP.httpSink req (\_ -> sinkFileCautious file_path)
+  HTTP.httpSink req $ \resp -> do
+    if HTTP.getResponseStatusCode resp /= 200
+      then throwM $ HttpExceptionRequest req (StatusCodeException resp (C.pack ""))
+      else sinkFileCautious file_path
   where
     http_req =
-      HTTP.parseRequest (T.unpack url)
+      HTTP.parseRequestThrow (T.unpack url)
         <&> HTTP.setRequestBasicAuth
           (encodeUtf8 $ serverConfigUsername config)
           (encodeUtf8 $ serverConfigPassword config)
