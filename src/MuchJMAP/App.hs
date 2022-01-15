@@ -26,13 +26,14 @@ import Network.JMAP.Core
     QueryState,
     GetState,
     Request (..),
+    MethodCallError,
     aesonOptionWithLabelPrefix,
     getPrimaryAccount,
     methodCallArgFrom,
     methodCallResponse',
   )
 import Network.JMAP.Mail
-  ( Email,
+  ( Email(..) ,
     EmailId (..),
     Mailbox (..),
     MailboxId (..),
@@ -52,10 +53,16 @@ errorM = Logger.errorM "App"
 kMaxGetPerCall :: Int
 kMaxGetPerCall = 500
 
-data JMAPException = JMAPException T.Text
+data AppException = AppException T.Text
   deriving (Show)
 
-instance Exception JMAPException
+instance Exception AppException
+
+fromRight :: (MonadIO m, MonadThrow m) => Either MethodCallError a -> m a
+fromRight (Left err) = do
+  liftIO $ errorM $ show err
+  throwM $ AppException "Failed in fromRight"
+fromRight (Right val) = return val
 
 data EmailFilter = EmailFilter {emailFilterMailboxes :: Maybe [T.Text]}
   deriving (Show, Generic)
@@ -86,8 +93,9 @@ data SyncState = SyncState
   { syncStateSession :: SessionResource,
     syncStateMailboxes :: [Mailbox],
     syncStateMailboxesState :: Maybe GetState,
-    syncStateEmails :: Map EmailId (Maybe Email),
-    syncStateEmailIdsState :: Maybe QueryState
+    syncStateEmails :: Map EmailId Email,
+    syncStateEmailIdsState :: Maybe QueryState,
+    syncStateEmailPropsState :: Maybe GetState
   }
   deriving (Show, Generic)
 
@@ -105,21 +113,17 @@ syncMailboxes
       syncStateMailboxesState = Nothing
     } = do
     api_response <- apiRequest (configServerConfig config, session) (Request [call])
-    case methodCallResponse' "call_0" api_response of
-      Left err -> do
-        liftIO $ errorM $ show err
-        throwM $ JMAPException "Failed to sync mailboxes"
-      Right call_response -> do
-        return $
-          sync_state
-            { syncStateMailboxes = getResponseList call_response,
-              syncStateMailboxesState = Just $ getResponseState call_response
-            }
+    call_response <- fromRight $ methodCallResponse' "call_0" api_response
+    return $
+      sync_state
+        { syncStateMailboxes = getResponseList call_response,
+          syncStateMailboxesState = Just $ getResponseState call_response
+        }
     where
       call = makeGetMailboxMethodCall "call_0" args
       args = [("accountId", methodCallArgFrom $ getPrimaryAccount session MailCapability)]
-syncMailboxes _ _ = error "syncMailboxes should only work when mailboxesState is empty"
 
+syncMailboxes _ _ = error "syncMailboxes should only work when mailboxesState is empty"
 -- full sync emails & emailIdsState using Email/query
 -- used when emails & emailIdsState is empty
 syncEmailsFull ::
@@ -129,7 +133,8 @@ syncEmailsFull ::
   m SyncState
 syncEmailsFull
   config
-  sync_state@SyncState{syncStateEmailIdsState=Nothing} =
+  sync_state@SyncState{syncStateEmailIdsState=Nothing,
+                      syncStateEmailPropsState=Nothing} =
   syncEmailsFullWithOffset 0 config sync_state{syncStateEmails=Map.empty}
 syncEmailsFull _ _ = error "syncEmailsFull should only work when emailIdsState is empty"
 
@@ -149,45 +154,64 @@ syncEmailsFullWithOffset
     { syncStateSession = session,
       syncStateMailboxes = mailboxes,
       syncStateEmails = old_emails,
-      syncStateEmailIdsState = old_query_state
+      syncStateEmailIdsState = old_query_state,
+      syncStateEmailPropsState = old_get_state
     } = do
     liftIO $
       infoM $
         "Running full query for email IDs, offset " ++ show offset ++ ", filters: " ++ show filter_condition
-    api_response <- apiRequest (server_config, session) (Request [query_call])
-    case methodCallResponse' "query_call" api_response of
-      Left err -> do
-        liftIO $ errorM $ show err
-        throwM $ JMAPException "Failed to run Email/query"
-      Right method_response -> handleResponse method_response
-    where
-      handleResponse resp
-        | isJust old_query_state && fromJust old_query_state /= queryResponseQueryState resp = do
-          liftIO $ warningM "QueryState changed, start over"
-          syncEmailsFull config
-            sync_state{
-                syncStateEmails = Map.empty,
-                syncStateEmailIdsState = Nothing}
-        | null (queryResponseIds resp) =
-          return sync_state {syncStateEmailIdsState = Just $ queryResponseQueryState resp}
-        | otherwise = do
-          let result_ids = queryResponseIds resp
-          liftIO $ infoM $ "Server returned " ++ show (length result_ids) ++ " email IDs"
-          let new_state =
-                sync_state {syncStateEmails =
-                            Map.union old_emails
-                            (Map.fromList (map (\id -> (id, Nothing)) result_ids))}
-          syncEmailsFullWithOffset (offset + length result_ids) config new_state
-      query_call = makeQueryEmailMethodCall "query_call" call_args
-      call_args =
-        [ ("accountId", methodCallArgFrom $ getPrimaryAccount session MailCapability),
-          ("position", methodCallArgFrom offset),
-          ("filter", methodCallArgFrom filter_condition),
-          ("limit", methodCallArgFrom kMaxGetPerCall)
-        ]
-      filter_condition =
-        encodeEmailFilter mailboxes filters
+    api_response <- apiRequest (server_config, session) (Request [query_call, get_call])
 
+    query_resp <- fromRight $ methodCallResponse' "query_call" api_response
+    let query_state = queryResponseQueryState (query_resp :: CommonQueryResponseBody EmailId)
+        query_result_ids = queryResponseIds query_resp
+
+    if isJust old_query_state && fromJust old_query_state /= query_state
+      then do
+        liftIO $ warningM "QueryState changed, start over"
+        syncEmailsFull
+          config
+          sync_state
+            { syncStateEmails = Map.empty,
+              syncStateEmailIdsState = Nothing
+            }
+      else
+        if null query_result_ids
+          then do
+            liftIO $ infoM "Query emails complete"
+            return sync_state {syncStateEmailIdsState = Just $ queryResponseQueryState query_resp}
+          else do
+            get_method_response <- fromRight $ methodCallResponse' "get_call" api_response
+            new_sync_state <- handleGetResponse (get_method_response :: CommonGetResponseBody Email)
+            syncEmailsFullWithOffset (offset + length query_result_ids) config new_sync_state
+    where
+      handleGetResponse resp = do
+        liftIO $ infoM $ "Server returned " ++ show (length (getResponseList resp)) ++ " email properties"
+        let new_emails = Map.fromList $ map (\m -> (emailId m, m)) (getResponseList resp)
+        return $
+          sync_state
+            { syncStateEmails = Map.union new_emails old_emails,
+              syncStateEmailPropsState =
+                if isNothing old_get_state
+                  then Just (getResponseState resp)
+                  else old_get_state
+            }
+      query_call =
+        makeQueryEmailMethodCall
+          "query_call"
+          [ ("accountId", methodCallArgFrom account_id),
+            ("position", methodCallArgFrom offset),
+            ("filter", methodCallArgFrom filter_condition),
+            ("limit", methodCallArgFrom kMaxGetPerCall)
+          ]
+      get_call =
+        makeGetEmailMethodCall
+          "get_call"
+          [ ("accountId", methodCallArgFrom account_id),
+            ("ids", ResultReference query_call "/ids")
+          ]
+      account_id = getPrimaryAccount session MailCapability
+      filter_condition = encodeEmailFilter mailboxes filters
 
 getAllEmail :: (MonadIO m, MonadThrow m) => RequestContext -> m [Email]
 getAllEmail (config, session) = do
@@ -211,5 +235,6 @@ runSync config = do
                             syncStateMailboxes = [],
                             syncStateMailboxesState = Nothing,
                             syncStateEmails = Map.empty,
-                            syncStateEmailIdsState = Nothing}
+                            syncStateEmailIdsState = Nothing,
+                            syncStateEmailPropsState = Nothing}
   syncMailboxes config sync_state >>= syncEmailsFull config

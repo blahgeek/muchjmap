@@ -15,6 +15,10 @@ import qualified Network.JMAP.Core as JMAPCore
 import qualified Network.JMAP.Mail as JMAPMail
 import System.Console.CmdArgs
 import System.Log.Logger
+import System.Log.Handler.Simple (verboseStreamHandler)
+import GHC.IO.Handle.FD (stderr)
+import System.Log.Formatter (simpleLogFormatter)
+import System.Log.Handler (LogHandler(setFormatter))
 
 data ConfigPath = ConfigPath {configPath :: FilePath}
   deriving (Show, Data, Typeable)
@@ -23,7 +27,11 @@ configPathArg = ConfigPath {configPath = def}
 
 main :: IO ()
 main = do
-  updateGlobalLogger "" (setLevel DEBUG)
+  log_handler <-
+    verboseStreamHandler stderr DEBUG >>= \h -> return $
+      setFormatter h (simpleLogFormatter "[$time : $loggername : $prio] $msg")
+  updateGlobalLogger ""
+    (setLevel DEBUG . setHandlers [log_handler])
   config_path <- cmdArgs configPathArg
   conf <- Yaml.decodeFileThrow $ configPath config_path
 
