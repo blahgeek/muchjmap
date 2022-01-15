@@ -44,3 +44,7 @@ data Config = Config
 
 instance Aeson.FromJSON Config where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "config"
+
+
+syncStateFilePath :: Config -> FilePath
+syncStateFilePath _ = "/tmp/muchjmap.sync.json"

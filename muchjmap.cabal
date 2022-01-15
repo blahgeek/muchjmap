@@ -47,6 +47,7 @@ library
     , cmdargs
     , conduit
     , containers
+    , directory
     , exceptions
     , file-embed
     , hslogger
@@ -78,6 +79,7 @@ executable muchjmap-exe
     , cmdargs
     , conduit
     , containers
+    , directory
     , exceptions
     , file-embed
     , hslogger
@@ -112,6 +114,7 @@ test-suite muchjmap-test
     , cmdargs
     , conduit
     , containers
+    , directory
     , exceptions
     , file-embed
     , hslogger

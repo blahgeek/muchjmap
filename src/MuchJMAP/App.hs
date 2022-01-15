@@ -11,6 +11,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Generics
 import qualified System.Log.Logger as Logger
+import System.Directory (doesFileExist)
 import Network.JMAP.API
   ( RequestContext,
     ServerConfig (..),
@@ -88,8 +89,11 @@ syncMailboxes
     { syncStateSession = session,
       syncStateMailboxesState = Nothing
     } = do
+    liftIO $ infoM "Syncing mailboxes..."
     api_response <- apiRequest (configServerConfig config, session) (Request [call])
     call_response <- fromRight $ methodCallResponse' "call_0" api_response
+    liftIO $ infoM $
+      "Sync mailboxes done. Got " ++ show (length (getResponseList call_response)) ++ " mailboxes"
     return $
       sync_state
         { syncStateMailboxes = getResponseList call_response,
@@ -135,7 +139,7 @@ syncEmailsFullWithOffset
     } = do
     liftIO $
       infoM $
-        "Running full query for email IDs, offset " ++ show offset ++ ", filters: " ++ show filter_condition
+        "Syncing emails (full query), offset " ++ show offset ++ ", filters: " ++ show filter_condition
     api_response <- apiRequest (server_config, session) (Request [query_call, get_call])
 
     query_resp <- fromRight $ methodCallResponse' "query_call" api_response
@@ -154,7 +158,7 @@ syncEmailsFullWithOffset
       else
         if null query_result_ids
           then do
-            liftIO $ infoM "Query emails complete"
+            liftIO $ infoM "Sync emails done."
             return sync_state {syncStateEmailIdsState = Just $ queryResponseQueryState query_resp}
           else do
             get_method_response <- fromRight $ methodCallResponse' "get_call" api_response
@@ -162,7 +166,7 @@ syncEmailsFullWithOffset
             syncEmailsFullWithOffset (offset + length query_result_ids) config new_sync_state
     where
       handleGetResponse resp = do
-        liftIO $ infoM $ "Server returned " ++ show (length (getResponseList resp)) ++ " email properties"
+        liftIO $ infoM $ "Got " ++ show (length (getResponseList resp)) ++ " emails"
         let new_emails = Map.fromList $ map (\m -> (emailId m, m)) (getResponseList resp)
         return $
           sync_state
@@ -189,31 +193,42 @@ syncEmailsFullWithOffset
       account_id = getPrimaryAccount session MailCapability
       filter_condition = encodeEmailFilter mailboxes filters
 
-getAllEmail :: (MonadIO m, MonadThrow m) => RequestContext -> m [Email]
-getAllEmail (config, session) = do
-  api_response <- apiRequest (config, session) (Request [query_call, get_call])
-  case methodCallResponse' "get_call" api_response of
-    Left _ -> return []
-    Right method_response -> return $ getResponseList method_response
-  where query_call = makeQueryEmailMethodCall "query_call"
-                        [ ("accountId", methodCallArgFrom $ getPrimaryAccount session MailCapability)
-                        , ("limit", methodCallArgFrom (10 :: Int))]
-        get_call = makeGetEmailMethodCall "get_call"
-                        [ ("accountId", methodCallArgFrom $ getPrimaryAccount session MailCapability)
-                        , ("ids", ResultReference query_call "/ids")]
 
-
-runSync :: (MonadIO m, MonadThrow m) => Config -> m SyncState
-runSync config = do
-  -- todo: input sync_state
+runSync :: (MonadIO m, MonadThrow m) => Config -> Maybe SyncState -> m SyncState
+runSync config Nothing = do
   session <- getSessionResource (configServerConfig config)
-  let sync_state =
-        SyncState
-          { syncStateSession = session,
-            syncStateMailboxes = [],
-            syncStateMailboxesState = Nothing,
-            syncStateEmails = Map.empty,
-            syncStateEmailIdsState = Nothing,
-            syncStateEmailPropsState = Nothing
-          }
-  syncMailboxes config sync_state >>= syncEmailsFull config
+  runSync config $
+    Just
+      SyncState
+        { syncStateSession = session,
+          syncStateMailboxes = [],
+          syncStateMailboxesState = Nothing,
+          syncStateEmails = Map.empty,
+          syncStateEmailIdsState = Nothing,
+          syncStateEmailPropsState = Nothing
+        }
+runSync config (Just sync_state@SyncState {syncStateMailboxesState = Nothing}) =
+  syncMailboxes config sync_state >>= \s -> runSync config (Just s)
+runSync
+  config
+  ( Just
+      sync_state@SyncState
+        { syncStateEmailIdsState = Nothing,
+          syncStateEmailPropsState = Nothing
+        }
+    ) =
+    syncEmailsFull config sync_state
+-- TODO
+runSync config (Just sync_state) = return sync_state
+
+
+runApp :: (MonadIO m, MonadThrow m) => Config -> m ()
+runApp config = do
+  let sync_state_filepath = syncStateFilePath config
+  sync_state <- liftIO $ do
+    file_exists <- doesFileExist sync_state_filepath
+    if file_exists then
+      Aeson.decodeFileStrict sync_state_filepath
+      else return Nothing
+  sync_state <- runSync config sync_state
+  liftIO $ Aeson.encodeFile (syncStateFilePath config) sync_state

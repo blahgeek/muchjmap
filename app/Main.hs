@@ -35,8 +35,7 @@ main = do
   config_path <- cmdArgs configPathArg
   conf <- Yaml.decodeFileThrow $ configPath config_path
 
-  sync_state <- App.runSync conf
-  print sync_state
+  App.runApp conf
 
   -- let server_config = configServerConfig conf
   -- let email_filter = configEmailFilter conf

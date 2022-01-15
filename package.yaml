@@ -34,6 +34,7 @@ dependencies:
 - hslogger
 - yaml
 - conduit
+- directory
 
 default-extensions:
   - DeriveGeneric
