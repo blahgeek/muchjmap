@@ -1,7 +1,7 @@
 module MuchJMAP.App where
 
 import Control.Monad (when)
-import Control.Monad.Catch (Exception, MonadThrow, throwM)
+import Control.Monad.Catch (Exception, MonadThrow, throwM, catch, MonadCatch)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -60,15 +60,14 @@ errorM = Logger.errorM "App"
 kMaxGetPerCall :: Int
 kMaxGetPerCall = 500
 
-data AppException = AppException T.Text
+data SyncException = SyncException T.Text
   deriving (Show)
 
-instance Exception AppException
+instance Exception SyncException
 
-fromRight :: (MonadIO m, MonadThrow m) => Either MethodCallError a -> m a
+fromRight :: (MonadIO m, MonadThrow m, Show e) => Either e a -> m a
 fromRight (Left err) = do
-  liftIO $ errorM $ show err
-  throwM $ AppException "Failed in fromRight"
+  throwM $ SyncException (T.pack (show err))
 fromRight (Right val) = return val
 
 data SyncState = SyncState
@@ -108,23 +107,6 @@ syncMailboxes
       call = makeGetMailboxMethodCall "call_0" args
       args = [("accountId", methodCallArgFrom $ getPrimaryAccount session MailCapability)]
 syncMailboxes _ _ = error "syncMailboxes should only work when mailboxesState is empty"
-
-mergeFromGetEmailResponse :: SyncState -> CommonGetResponseBody Email -> SyncState
-mergeFromGetEmailResponse
-  sync_state@SyncState
-    { syncStateEmails = old_emails,
-      syncStateEmailPropsState = old_get_state
-    }
-  resp =
-    sync_state
-      { syncStateEmails = Map.union new_emails old_emails,
-        syncStateEmailPropsState =
-          if isNothing old_get_state
-            then Just (getResponseState resp)
-            else old_get_state
-      }
-    where
-      new_emails = Map.fromList $ map (\m -> (emailId m, m)) (getResponseList resp)
 
 addToMap :: Ord k => [(k, v)] -> Map k v -> Map k v
 addToMap elems = Map.union (Map.fromList elems)
@@ -289,34 +271,39 @@ syncEmailsDelta
       account_id = getPrimaryAccount session MailCapability
       filter_condition = encodeEmailFilter mailboxes filters
 
-runSync :: (MonadIO m, MonadThrow m) => Config -> Maybe SyncState -> m SyncState
-runSync config Nothing = do
-  session <- getSessionResource (configServerConfig config)
-  runSync config $
-    Just
-      SyncState
-        { syncStateSession = session,
-          syncStateMailboxes = [],
-          syncStateMailboxesState = Nothing,
-          syncStateEmails = Map.empty,
-          syncStateEmailIdsState = Nothing,
-          syncStateEmailPropsState = Nothing
-        }
-runSync config (Just sync_state@SyncState {syncStateMailboxesState = Nothing}) =
-  syncMailboxes config sync_state >>= \s -> runSync config (Just s)
+runSync :: (MonadIO m, MonadThrow m, MonadCatch m) => Config -> Maybe SyncState -> m SyncState
 runSync
   config
   ( Just
       sync_state@SyncState
-        { syncStateEmailIdsState = Nothing,
-          syncStateEmailPropsState = Nothing
+        { syncStateMailboxesState = Just _,
+          syncStateEmailIdsState = Just _,
+          syncStateEmailPropsState = Just _
         }
-    ) =
-    syncEmailsFull config sync_state
-runSync config (Just sync_state) =
-  syncEmailsDelta config sync_state
-
-runApp :: (MonadIO m, MonadThrow m) => Config -> m ()
+    ) = do
+    liftIO $ infoM "Running partial sync..."
+    catch
+      (syncEmailsDelta config sync_state)
+      ( \e -> do
+          liftIO $ errorM (show (e :: SyncException))
+          liftIO $ warningM "Partial sync failed, fallback to full sync."
+          runSync config Nothing
+      )
+runSync config _ = do
+  liftIO $ infoM "Running full sync..."
+  session <- getSessionResource (configServerConfig config)
+  let initial_sync_state =
+        SyncState
+          { syncStateSession = session,
+            syncStateMailboxes = [],
+            syncStateMailboxesState = Nothing,
+            syncStateEmails = Map.empty,
+            syncStateEmailIdsState = Nothing,
+            syncStateEmailPropsState = Nothing
+          }
+  syncMailboxes config initial_sync_state
+    >>= \s -> syncEmailsFull config s
+runApp :: (MonadIO m, MonadThrow m, MonadCatch m) => Config -> m ()
 runApp config = do
   let sync_state_filepath = syncStateFilePath config
   sync_state <- liftIO $ do
