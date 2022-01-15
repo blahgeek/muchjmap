@@ -21,6 +21,7 @@ module Network.JMAP.Core
     methodCallResponse',
     MethodCallError (..),
     QueryState (..),
+    GetState (..),
     AccountId (..),
     BlobId (..),
   )
@@ -87,11 +88,14 @@ instance Aeson.FromJSON Capability where
 instance Aeson.FromJSONKey Capability where
   fromJSONKey = Aeson.FromJSONKeyText fromCapabilityName
 
+instance Aeson.ToJSONKey Capability where
+  toJSONKey = Aeson.Types.toJSONKeyText capabilityName
+
 instance Ord Capability where
   (<=) a b = capabilityName a <= capabilityName b
 
 newtype AccountId = AccountId T.Text
-  deriving (Aeson.ToJSON, Aeson.FromJSON, Aeson.FromJSONKey, Eq, Ord, Show)
+  deriving (Aeson.ToJSON, Aeson.FromJSON, Aeson.FromJSONKey, Aeson.ToJSONKey, Eq, Ord, Show)
 
 newtype BlobId = BlobId T.Text
   deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Data)
@@ -101,6 +105,9 @@ data SessionResourceAccount = SessionResourceAccount {accountName :: T.Text}
 
 instance Aeson.FromJSON SessionResourceAccount where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "account"
+
+instance Aeson.ToJSON SessionResourceAccount where
+  toJSON = Aeson.genericToJSON $ aesonOptionWithLabelPrefix "account"
 
 data SessionResource = SessionResource
   { sessionAccounts :: Map AccountId SessionResourceAccount,
@@ -113,6 +120,9 @@ data SessionResource = SessionResource
 
 instance Aeson.FromJSON SessionResource where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "session"
+
+instance Aeson.ToJSON SessionResource where
+  toJSON = Aeson.genericToJSON $ aesonOptionWithLabelPrefix "session"
 
 getPrimaryAccount :: SessionResource -> Capability -> AccountId
 getPrimaryAccount session c =

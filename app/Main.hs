@@ -26,29 +26,33 @@ main = do
   updateGlobalLogger "" (setLevel DEBUG)
   config_path <- cmdArgs configPathArg
   conf <- Yaml.decodeFileThrow $ configPath config_path
-  let server_config = configServerConfig conf
-  let email_filter = configEmailFilter conf
 
-  session <- JMAPAPI.getSessionResource server_config
-  print session
-  mailboxes <- App.getAllMailbox (server_config, session)
-  print mailboxes
-  -- emails <- App.queryEmailIdsFull (server_config, session) (App.encodeEmailFilter mailboxes email_filter)
+  sync_state <- App.runSync conf
+  print sync_state
+
+  -- let server_config = configServerConfig conf
+  -- let email_filter = configEmailFilter conf
+
+  -- session <- JMAPAPI.getSessionResource server_config
+  -- print session
+  -- mailboxes <- App.getAllMailbox (server_config, session)
+  -- print mailboxes
+  -- -- emails <- App.queryEmailIdsFull (server_config, session) (App.encodeEmailFilter mailboxes email_filter)
+  -- -- print emails
+  -- emails <- App.getAllEmail (server_config, session)
   -- print emails
-  emails <- App.getAllEmail (server_config, session)
-  print emails
 
-  mvars <-
-    ( forM emails $ \email -> do
-        mvar <- newEmptyMVar
-        forkIO $ do
-          runResourceT $
-            JMAPAPI.downloadBlob
-              (server_config, session)
-              (JMAPCore.getPrimaryAccount session JMAPCore.MailCapability)
-              (JMAPMail.emailBlobId email)
-              "/tmp/mail.txt"
-          putMVar mvar ()
-        return mvar
-      )
-  forM_ mvars takeMVar
+  -- mvars <-
+  --   ( forM emails $ \email -> do
+  --       mvar <- newEmptyMVar
+  --       forkIO $ do
+  --         runResourceT $
+  --           JMAPAPI.downloadBlob
+  --             (server_config, session)
+  --             (JMAPCore.getPrimaryAccount session JMAPCore.MailCapability)
+  --             (JMAPMail.emailBlobId email)
+  --             "/tmp/mail.txt"
+  --         putMVar mvar ()
+  --       return mvar
+  --     )
+  -- forM_ mvars takeMVar

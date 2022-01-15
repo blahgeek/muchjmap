@@ -25,7 +25,7 @@ import Network.JMAP.Core
   )
 
 newtype MailboxId = MailboxId T.Text
-  deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Aeson.FromJSONKey, Eq, Data)
+  deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Aeson.FromJSONKey, Aeson.ToJSONKey, Eq, Data)
 
 instance Ord MailboxId where
   compare (MailboxId a) (MailboxId b) = compare a b
@@ -39,6 +39,9 @@ data Mailbox = Mailbox
 
 instance Aeson.FromJSON Mailbox where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "mailbox"
+
+instance Aeson.ToJSON Mailbox where
+  toJSON = Aeson.genericToJSON $ aesonOptionWithLabelPrefix "mailbox"
 
 mailboxFullName :: [Mailbox] -> Mailbox -> T.Text
 mailboxFullName mailboxes Mailbox {mailboxName = name, mailboxParentId = Nothing} = name
@@ -63,10 +66,10 @@ makeGetMailboxMethodCall id args =
       ("properties", methodCallArgFrom $ fieldLabels "mailbox" (undefined :: Mailbox)) : args
 
 newtype EmailId = EmailId T.Text
-  deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Data)
+  deriving (Aeson.ToJSON, Aeson.FromJSON, Show, Data, Eq, Ord, Aeson.FromJSONKey, Aeson.ToJSONKey)
 
 newtype EmailKeyword = EmailKeyword T.Text
-  deriving (Aeson.ToJSON, Aeson.FromJSON, Aeson.FromJSONKey, Eq, Ord, Show, Data)
+  deriving (Aeson.ToJSON, Aeson.FromJSON, Aeson.FromJSONKey, Aeson.ToJSONKey, Eq, Ord, Show, Data)
 
 data Email = Email
   { emailId :: EmailId,
@@ -79,6 +82,9 @@ data Email = Email
 
 instance Aeson.FromJSON Email where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "email"
+
+instance Aeson.ToJSON Email where
+  toJSON = Aeson.genericToJSON $ aesonOptionWithLabelPrefix "email"
 
 makeGetEmailMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
 makeGetEmailMethodCall id args =
