@@ -108,3 +108,12 @@ makeQueryEmailMethodCall id args =
       methodCallId = id,
       methodCallArgs = methodCallArgsFrom args
     }
+
+makeQueryChangesEmailMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
+makeQueryChangesEmailMethodCall id args =
+  MethodCall
+    { methodCallCapability = MailCapability,
+      methodCallName = "Email/queryChanges",
+      methodCallId = id,
+      methodCallArgs = methodCallArgsFrom args
+    }

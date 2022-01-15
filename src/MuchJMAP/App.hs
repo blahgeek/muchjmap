@@ -7,6 +7,7 @@ import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import Data.Maybe
 import qualified Data.Text as T
+import qualified Data.ByteString.Lazy.Char8 as C
 import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Generics
@@ -23,6 +24,7 @@ import Network.JMAP.Core
     SessionResource (..),
     CommonGetResponseBody (..),
     CommonQueryResponseBody (..),
+    CommonQueryChangesResponseBody (..),
     FilterCondition (..),
     MethodCallArg (..),
     QueryState,
@@ -32,7 +34,7 @@ import Network.JMAP.Core
     aesonOptionWithLabelPrefix,
     getPrimaryAccount,
     methodCallArgFrom,
-    methodCallResponse',
+    methodCallResponse', methodCallResponse
   )
 import Network.JMAP.Mail
   ( Email(..) ,
@@ -43,6 +45,7 @@ import Network.JMAP.Mail
     makeGetEmailMethodCall,
     makeGetMailboxMethodCall,
     makeQueryEmailMethodCall,
+    makeQueryChangesEmailMethodCall,
   )
 import MuchJMAP.Config
 
@@ -104,6 +107,24 @@ syncMailboxes
       args = [("accountId", methodCallArgFrom $ getPrimaryAccount session MailCapability)]
 syncMailboxes _ _ = error "syncMailboxes should only work when mailboxesState is empty"
 
+
+mergeFromGetEmailResponse :: SyncState -> CommonGetResponseBody Email -> SyncState
+mergeFromGetEmailResponse
+  sync_state@SyncState
+    { syncStateEmails = old_emails,
+      syncStateEmailPropsState = old_get_state
+    }
+  resp =
+    sync_state
+      { syncStateEmails = Map.union new_emails old_emails,
+        syncStateEmailPropsState =
+          if isNothing old_get_state
+            then Just (getResponseState resp)
+            else old_get_state
+      }
+    where
+      new_emails = Map.fromList $ map (\m -> (emailId m, m)) (getResponseList resp)
+
 -- full sync emails & emailIdsState using Email/query
 -- used when emails & emailIdsState is empty
 syncEmailsFull ::
@@ -162,20 +183,10 @@ syncEmailsFullWithOffset
             return sync_state {syncStateEmailIdsState = Just $ queryResponseQueryState query_resp}
           else do
             get_method_response <- fromRight $ methodCallResponse' "get_call" api_response
-            new_sync_state <- handleGetResponse (get_method_response :: CommonGetResponseBody Email)
+            liftIO $ infoM $ "Got " ++ show (length (getResponseList get_method_response)) ++ " emails"
+            let new_sync_state = mergeFromGetEmailResponse sync_state get_method_response
             syncEmailsFullWithOffset (offset + length query_result_ids) config new_sync_state
     where
-      handleGetResponse resp = do
-        liftIO $ infoM $ "Got " ++ show (length (getResponseList resp)) ++ " emails"
-        let new_emails = Map.fromList $ map (\m -> (emailId m, m)) (getResponseList resp)
-        return $
-          sync_state
-            { syncStateEmails = Map.union new_emails old_emails,
-              syncStateEmailPropsState =
-                if isNothing old_get_state
-                  then Just (getResponseState resp)
-                  else old_get_state
-            }
       query_call =
         makeQueryEmailMethodCall
           "query_call"
@@ -193,6 +204,49 @@ syncEmailsFullWithOffset
       account_id = getPrimaryAccount session MailCapability
       filter_condition = encodeEmailFilter mailboxes filters
 
+syncEmailsDelta :: (MonadIO m, MonadThrow m) => Config -> SyncState -> m SyncState
+syncEmailsDelta
+  config@Config
+    { configServerConfig = server_config,
+      configEmailFilter = filters
+    }
+  sync_state@SyncState
+    { syncStateSession = session,
+      syncStateMailboxes = mailboxes,
+      syncStateEmailIdsState = old_query_state
+    } = do
+    liftIO $ infoM $ "Syncing emails (by changes), filters: " ++ show filters
+    api_response <- apiRequest (server_config, session) (Request [query_call, get_call])
+
+    query_resp <- fromRight $ methodCallResponse' "query_call" api_response
+    let new_query_state = queryChangesResponseNewQueryState (query_resp :: CommonQueryChangesResponseBody EmailId)
+        removed_ids = queryChangesResponseRemoved query_resp
+        added_items = queryChangesResponseAdded query_resp
+    liftIO $ infoM $ "Got " ++ show (length removed_ids) ++ " removed emails, " ++ show (length added_items) ++ " added emails"
+
+    get_resp <- fromRight $ methodCallResponse' "get_call" api_response
+    let new_state =
+          sync_state
+            { syncStateEmailIdsState = Just new_query_state,
+              syncStateEmails = foldr Map.delete (syncStateEmails sync_state) removed_ids
+            }
+    return $ mergeFromGetEmailResponse new_state get_resp
+    where
+      query_call =
+        makeQueryChangesEmailMethodCall
+          "query_call"
+          [ ("accountId", methodCallArgFrom account_id),
+            ("filter", methodCallArgFrom filter_condition),
+            ("sinceQueryState", methodCallArgFrom old_query_state)
+          ]
+      get_call =
+        makeGetEmailMethodCall
+          "get_call"
+          [ ("accountId", methodCallArgFrom account_id),
+            ("ids", ResultReference query_call "/added/*/id")
+          ]
+      account_id = getPrimaryAccount session MailCapability
+      filter_condition = encodeEmailFilter mailboxes filters
 
 runSync :: (MonadIO m, MonadThrow m) => Config -> Maybe SyncState -> m SyncState
 runSync config Nothing = do
@@ -218,9 +272,8 @@ runSync
         }
     ) =
     syncEmailsFull config sync_state
--- TODO
-runSync config (Just sync_state) = return sync_state
-
+runSync config (Just sync_state) =
+  syncEmailsDelta config sync_state
 
 runApp :: (MonadIO m, MonadThrow m) => Config -> m ()
 runApp config = do
@@ -231,4 +284,5 @@ runApp config = do
       Aeson.decodeFileStrict sync_state_filepath
       else return Nothing
   sync_state <- runSync config sync_state
-  liftIO $ Aeson.encodeFile (syncStateFilePath config) sync_state
+  let sync_state_bs = C.toStrict $ Aeson.encode sync_state
+  liftIO $ C.writeFile sync_state_filepath (C.fromStrict sync_state_bs)
