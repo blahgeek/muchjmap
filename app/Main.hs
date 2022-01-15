@@ -1,26 +1,25 @@
 module Main where
 
-import qualified Network.JMAP.API as JMAPAPI
-import qualified Network.JMAP.Core as JMAPCore
-import qualified Network.JMAP.Mail as JMAPMail
-
-import System.Log.Logger
-import System.Console.CmdArgs
+import Conduit (runResourceT)
+import Control.Concurrent (forkIO, newEmptyMVar, putMVar, takeMVar)
+import Control.Monad (forM, forM_)
 import qualified Data.ByteString.Char8 as C
 import Data.Data (Data, Typeable)
 import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
+import MuchJMAP.App (Config (..))
 import qualified MuchJMAP.App as App
-import MuchJMAP.App (Config(..))
-import Control.Monad (forM_, forM)
-import Conduit (runResourceT)
-import Control.Concurrent (newEmptyMVar, forkIO, takeMVar, putMVar)
+import qualified Network.JMAP.API as JMAPAPI
+import qualified Network.JMAP.Core as JMAPCore
+import qualified Network.JMAP.Mail as JMAPMail
+import System.Console.CmdArgs
+import System.Log.Logger
 
-data ConfigPath = ConfigPath { configPath :: FilePath }
+data ConfigPath = ConfigPath {configPath :: FilePath}
   deriving (Show, Data, Typeable)
 
-configPathArg = ConfigPath { configPath = def}
+configPathArg = ConfigPath {configPath = def}
 
 main :: IO ()
 main = do
@@ -40,15 +39,16 @@ main = do
   print emails
 
   mvars <-
-        (forM emails $ \email -> do
-            mvar <- newEmptyMVar
-            forkIO $ do
-              runResourceT $
-                JMAPAPI.downloadBlob
-                  (server_config, session)
-                  (JMAPCore.getPrimaryAccount session JMAPCore.MailCapability)
-                  (JMAPMail.emailBlobId email)
-                  "/tmp/mail.txt"
-              putMVar mvar ()
-            return mvar)
+    ( forM emails $ \email -> do
+        mvar <- newEmptyMVar
+        forkIO $ do
+          runResourceT $
+            JMAPAPI.downloadBlob
+              (server_config, session)
+              (JMAPCore.getPrimaryAccount session JMAPCore.MailCapability)
+              (JMAPMail.emailBlobId email)
+              "/tmp/mail.txt"
+          putMVar mvar ()
+        return mvar
+      )
   forM_ mvars takeMVar
