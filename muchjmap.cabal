@@ -25,6 +25,7 @@ library
   exposed-modules:
       MuchJMAP.App
       MuchJMAP.Config
+      MuchJMAP.Sync
       Network.JMAP.API
       Network.JMAP.Core
       Network.JMAP.Echo
