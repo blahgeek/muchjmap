@@ -32,6 +32,12 @@ library
       Paths_muchjmap
   hs-source-dirs:
       src
+  default-extensions:
+      DeriveGeneric
+      OverloadedStrings
+      FlexibleContexts
+      DeriveDataTypeable
+      GeneralizedNewtypeDeriving
   build-depends:
       QuickCheck
     , aeson
@@ -56,6 +62,12 @@ executable muchjmap-exe
       Paths_muchjmap
   hs-source-dirs:
       app
+  default-extensions:
+      DeriveGeneric
+      OverloadedStrings
+      FlexibleContexts
+      DeriveDataTypeable
+      GeneralizedNewtypeDeriving
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       QuickCheck
@@ -84,6 +96,12 @@ test-suite muchjmap-test
       Paths_muchjmap
   hs-source-dirs:
       test
+  default-extensions:
+      DeriveGeneric
+      OverloadedStrings
+      FlexibleContexts
+      DeriveDataTypeable
+      GeneralizedNewtypeDeriving
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       QuickCheck

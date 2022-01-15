@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Main where
 
 import qualified Network.JMAP.API as JMAPAPI

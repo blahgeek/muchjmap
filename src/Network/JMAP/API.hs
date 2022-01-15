@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
-
 module Network.JMAP.API ( ServerConfig(..)
                          , getSessionResource
                          , apiRequest
