@@ -13,6 +13,7 @@ module Network.JMAP.Core
     CommonGetResponseBody (..),
     CommonQueryResponseBody (..),
     CommonQueryChangesResponseBody (..),
+    CommonChangesResponseBody (..),
     FilterCondition (..),
     SortComparator (..),
     aesonOptionWithLabelPrefix,
@@ -329,3 +330,18 @@ data CommonQueryChangesResponseBody id = CommonQueryChangesResponseBody
 
 instance (Aeson.FromJSON id) => Aeson.FromJSON (CommonQueryChangesResponseBody id) where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "queryChangesResponse"
+
+
+data CommonChangesResponseBody id = CommonChangesResponseBody
+  { changesResponseAccountId :: AccountId,
+    changesResponseOldState :: GetState,
+    changesResponseNewState :: GetState,
+    changesResponseHasMoreChanges :: Bool,
+    changesResponseCreated :: [id],
+    changesResponseUpdated :: [id],
+    changesResponseDestroyed :: [id]
+  }
+  deriving (Show, Generic)
+
+instance (Aeson.FromJSON id) => Aeson.FromJSON (CommonChangesResponseBody id) where
+  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "changesResponse"

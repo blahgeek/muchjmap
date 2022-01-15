@@ -86,8 +86,8 @@ instance Aeson.FromJSON Email where
 instance Aeson.ToJSON Email where
   toJSON = Aeson.genericToJSON $ aesonOptionWithLabelPrefix "email"
 
-makeGetEmailMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
-makeGetEmailMethodCall id args =
+makeEmailGetMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
+makeEmailGetMethodCall id args =
   MethodCall
     { methodCallCapability = MailCapability,
       methodCallName = "Email/get",
@@ -100,8 +100,8 @@ makeGetEmailMethodCall id args =
       ("bodyProperties", methodCallArgFrom ([] :: [String])) :
       args
 
-makeQueryEmailMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
-makeQueryEmailMethodCall id args =
+makeEmailQueryMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
+makeEmailQueryMethodCall id args =
   MethodCall
     { methodCallCapability = MailCapability,
       methodCallName = "Email/query",
@@ -109,11 +109,20 @@ makeQueryEmailMethodCall id args =
       methodCallArgs = methodCallArgsFrom args
     }
 
-makeQueryChangesEmailMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
-makeQueryChangesEmailMethodCall id args =
+makeEmailQueryChangesMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
+makeEmailQueryChangesMethodCall id args =
   MethodCall
     { methodCallCapability = MailCapability,
       methodCallName = "Email/queryChanges",
+      methodCallId = id,
+      methodCallArgs = methodCallArgsFrom args
+    }
+
+makeEmailChangesMethodCall :: T.Text -> [(T.Text, MethodCallArg)] -> MethodCall
+makeEmailChangesMethodCall id args =
+  MethodCall
+    { methodCallCapability = MailCapability,
+      methodCallName = "Email/changes",
       methodCallId = id,
       methodCallArgs = methodCallArgsFrom args
     }
