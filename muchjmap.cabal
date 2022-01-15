@@ -24,6 +24,7 @@ source-repository head
 library
   exposed-modules:
       MuchJMAP.App
+      MuchJMAP.Config
       Network.JMAP.API
       Network.JMAP.Core
       Network.JMAP.Echo

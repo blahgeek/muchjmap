@@ -8,7 +8,7 @@ import Data.Data (Data, Typeable)
 import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import MuchJMAP.App (Config (..))
+import MuchJMAP.Config (Config (..))
 import qualified MuchJMAP.App as App
 import qualified Network.JMAP.API as JMAPAPI
 import qualified Network.JMAP.Core as JMAPCore

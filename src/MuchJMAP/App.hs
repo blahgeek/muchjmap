@@ -10,6 +10,7 @@ import qualified Data.Text as T
 import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC.Generics
+import qualified System.Log.Logger as Logger
 import Network.JMAP.API
   ( RequestContext,
     ServerConfig (..),
@@ -42,7 +43,7 @@ import Network.JMAP.Mail
     makeGetMailboxMethodCall,
     makeQueryEmailMethodCall,
   )
-import qualified System.Log.Logger as Logger
+import MuchJMAP.Config
 
 infoM = Logger.infoM "App"
 
@@ -63,31 +64,6 @@ fromRight (Left err) = do
   liftIO $ errorM $ show err
   throwM $ AppException "Failed in fromRight"
 fromRight (Right val) = return val
-
-data EmailFilter = EmailFilter {emailFilterMailboxes :: Maybe [T.Text]}
-  deriving (Show, Generic)
-
-instance Aeson.FromJSON EmailFilter where
-  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "emailFilter"
-
-encodeEmailFilter :: [Mailbox] -> EmailFilter -> FilterCondition
-encodeEmailFilter mailboxes EmailFilter {emailFilterMailboxes = mailbox_names} =
-  FilterOpAND (op_in_mailbox mailbox_names)
-  where
-    op_in_mailbox Nothing = []
-    op_in_mailbox (Just names) =
-      let ids = map (mailboxId . fromJust) $ filter isJust $ map (findMailboxByFullName mailboxes) names
-       in [FilterOpOR $ map (\m -> FilterValue $ Aeson.object ["inMailbox" .= m]) ids]
-
-data Config = Config
-  { configServerConfig :: ServerConfig,
-    configEmailFilter :: EmailFilter
-  }
-  deriving (Show, Generic)
-
-instance Aeson.FromJSON Config where
-  parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "config"
-
 
 data SyncState = SyncState
   { syncStateSession :: SessionResource,
