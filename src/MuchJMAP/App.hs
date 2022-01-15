@@ -122,8 +122,8 @@ syncMailboxes
     where
       call = makeGetMailboxMethodCall "call_0" args
       args = [("accountId", methodCallArgFrom $ getPrimaryAccount session MailCapability)]
-
 syncMailboxes _ _ = error "syncMailboxes should only work when mailboxesState is empty"
+
 -- full sync emails & emailIdsState using Email/query
 -- used when emails & emailIdsState is empty
 syncEmailsFull ::
@@ -231,10 +231,13 @@ runSync :: (MonadIO m, MonadThrow m) => Config -> m SyncState
 runSync config = do
   -- todo: input sync_state
   session <- getSessionResource (configServerConfig config)
-  let sync_state = SyncState{ syncStateSession = session,
-                            syncStateMailboxes = [],
-                            syncStateMailboxesState = Nothing,
-                            syncStateEmails = Map.empty,
-                            syncStateEmailIdsState = Nothing,
-                            syncStateEmailPropsState = Nothing}
+  let sync_state =
+        SyncState
+          { syncStateSession = session,
+            syncStateMailboxes = [],
+            syncStateMailboxesState = Nothing,
+            syncStateEmails = Map.empty,
+            syncStateEmailIdsState = Nothing,
+            syncStateEmailPropsState = Nothing
+          }
   syncMailboxes config sync_state >>= syncEmailsFull config
