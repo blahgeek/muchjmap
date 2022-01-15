@@ -12,11 +12,13 @@ import System.Console.CmdArgs
 import qualified Data.ByteString.Char8 as C
 import Data.Data (Data, Typeable)
 import Data.Maybe
+import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import qualified MuchJMAP.App as App
 import MuchJMAP.App (Config(..))
-import Control.Monad (forM_)
+import Control.Monad (forM_, forM)
 import Conduit (runResourceT)
+import Control.Concurrent (newEmptyMVar, forkIO, takeMVar, putMVar)
 
 data ConfigPath = ConfigPath { configPath :: FilePath }
   deriving (Show, Data, Typeable)
@@ -40,10 +42,16 @@ main = do
   emails <- App.getAllEmail (server_config, session)
   print emails
 
-  forM_ emails $ \email -> do
-    runResourceT $
-      JMAPAPI.downloadBlob
-        (server_config, session)
-        (JMAPCore.getPrimaryAccount session JMAPCore.MailCapability)
-        (JMAPMail.emailBlobId email)
-        "/tmp/mail.txt"
+  mvars <-
+        (forM emails $ \email -> do
+            mvar <- newEmptyMVar
+            forkIO $ do
+              runResourceT $
+                JMAPAPI.downloadBlob
+                  (server_config, session)
+                  (JMAPCore.getPrimaryAccount session JMAPCore.MailCapability)
+                  (JMAPMail.emailBlobId email)
+                  "/tmp/mail.txt"
+              putMVar mvar ()
+            return mvar)
+  forM_ mvars takeMVar
