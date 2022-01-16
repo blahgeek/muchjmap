@@ -1,7 +1,7 @@
 module MuchJMAP.Download where
 
-import Control.Monad (forM_, forM)
-import Control.Monad.Catch (Exception, MonadThrow, MonadCatch, catchAll)
+import Control.Monad (forM_, forM, when)
+import Control.Monad.Catch (Exception, throwM, MonadCatch, catchAll)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Text as T
 import Data.Set (Set)
@@ -28,6 +28,10 @@ import Data.List (isSuffixOf)
 infoM = Logger.infoM "Download"
 errorM = Logger.errorM "Download"
 
+data DownloadException = DownloadException T.Text
+  deriving (Show)
+
+instance Exception DownloadException
 
 kDownloadConcurrentJobs :: Int
 kDownloadConcurrentJobs = 8
@@ -57,12 +61,14 @@ downloadAllEmails (config, session) dir emails = do
     mvar <- newEmptyMVar
     forkIO $ do
       waitQSem sem
-      catchAll (doDownload email) $ \e -> do
+      catchAll (doDownload email >> putMVar mvar True) $ \e -> do
         errorM $ "Error during downloading: " ++ show e
-      putMVar mvar ()
+        putMVar mvar False
       signalQSem sem
     return mvar
-  forM_ job_mvars takeMVar
+  job_results <- forM job_mvars takeMVar
+  when (any not job_results) $ throwM $ DownloadException $ T.pack $
+    "Failed to download " ++ show (length . filter not $ job_results) ++ " files"
   where
     doDownload email = do
       infoM $ "Downloading email " ++ emailFilename email
