@@ -22,7 +22,7 @@ runApp config = do
 
   liftIO $ downloadAllEmails
     (configServerConfig config, pullStateSession pull_state)
-    (emailBlobDirectoryPath config)
+    (configMaildir config)
     (Map.elems (pullStateEmails pull_state))
 
   let pull_state_bs = C.toStrict $ Aeson.encode pull_state

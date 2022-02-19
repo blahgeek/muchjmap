@@ -5,6 +5,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Text as T
 import Data.Aeson ((.=))
 import Data.Maybe
+import System.FilePath ((</>))
 
 import Network.JMAP.API
   ( ServerConfig (..),
@@ -18,6 +19,7 @@ import Network.JMAP.Mail
     MailboxId (..),
     findMailboxByFullName,
   )
+import MuchJMAP.Maildir (Maildir, maildirPath)
 
 
 data EmailFilter = EmailFilter {emailFilterMailboxes :: Maybe [T.Text]}
@@ -37,7 +39,8 @@ encodeEmailFilter mailboxes EmailFilter {emailFilterMailboxes = mailbox_names} =
 
 
 data Config = Config
-  { configServerConfig :: ServerConfig,
+  { configMaildir :: Maildir,
+    configServerConfig :: ServerConfig,
     configEmailFilter :: EmailFilter
   }
   deriving (Show, Generic)
@@ -47,7 +50,4 @@ instance Aeson.FromJSON Config where
 
 
 pullStateFilePath :: Config -> FilePath
-pullStateFilePath _ = "/tmp/muchjmap.pull.json"
-
-emailBlobDirectoryPath :: Config -> FilePath
-emailBlobDirectoryPath _ = "/tmp/muchjmap.maildir"
+pullStateFilePath conf = maildirPath (configMaildir conf) </> ".muchjmap.pull_state.json"

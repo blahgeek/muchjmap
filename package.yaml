@@ -36,6 +36,7 @@ dependencies:
 - conduit
 - directory
 - notmuch
+- filepath
 
 default-extensions:
   - DeriveGeneric

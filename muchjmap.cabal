@@ -26,6 +26,7 @@ library
       MuchJMAP.App
       MuchJMAP.Config
       MuchJMAP.Download
+      MuchJMAP.Maildir
       MuchJMAP.Pull
       Network.JMAP.API
       Network.JMAP.Core
@@ -52,6 +53,7 @@ library
     , directory
     , exceptions
     , file-embed
+    , filepath
     , hslogger
     , hspec
     , http-conduit
@@ -85,6 +87,7 @@ executable muchjmap-exe
     , directory
     , exceptions
     , file-embed
+    , filepath
     , hslogger
     , hspec
     , http-conduit
@@ -121,6 +124,7 @@ test-suite muchjmap-test
     , directory
     , exceptions
     , file-embed
+    , filepath
     , hslogger
     , hspec
     , http-conduit
