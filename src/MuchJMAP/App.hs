@@ -5,25 +5,25 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Aeson as Aeson
 import qualified Data.Map as Map
 import MuchJMAP.Config
-import MuchJMAP.Sync
+import MuchJMAP.Pull
 import MuchJMAP.Download
 import qualified Data.ByteString.Lazy.Char8 as C
 import System.Directory (doesFileExist)
 
 runApp :: (MonadIO m, MonadThrow m, MonadCatch m) => Config -> m ()
 runApp config = do
-  let sync_state_filepath = syncStateFilePath config
-  sync_state <- liftIO $ do
-    file_exists <- doesFileExist sync_state_filepath
+  let pull_state_filepath = pullStateFilePath config
+  pull_state <- liftIO $ do
+    file_exists <- doesFileExist pull_state_filepath
     if file_exists then
-      Aeson.decodeFileStrict sync_state_filepath
+      Aeson.decodeFileStrict pull_state_filepath
       else return Nothing
-  sync_state <- runSync config sync_state
+  pull_state <- runPull config pull_state
 
   liftIO $ downloadAllEmails
-    (configServerConfig config, syncStateSession sync_state)
+    (configServerConfig config, pullStateSession pull_state)
     (emailBlobDirectoryPath config)
-    (Map.elems (syncStateEmails sync_state))
+    (Map.elems (pullStateEmails pull_state))
 
-  let sync_state_bs = C.toStrict $ Aeson.encode sync_state
-  liftIO $ C.writeFile sync_state_filepath (C.fromStrict sync_state_bs)
+  let pull_state_bs = C.toStrict $ Aeson.encode pull_state
+  liftIO $ C.writeFile pull_state_filepath (C.fromStrict pull_state_bs)
