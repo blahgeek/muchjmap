@@ -28,15 +28,6 @@ data EmailFilter = EmailFilter {emailFilterMailboxes :: Maybe [T.Text]}
 instance Aeson.FromJSON EmailFilter where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "emailFilter"
 
-encodeEmailFilter :: [Mailbox] -> EmailFilter -> FilterCondition
-encodeEmailFilter mailboxes EmailFilter {emailFilterMailboxes = mailbox_names} =
-  FilterOpAND (op_in_mailbox mailbox_names)
-  where
-    op_in_mailbox Nothing = []
-    op_in_mailbox (Just names) =
-      let ids = map (mailboxId . fromJust) $ filter isJust $ map (findMailboxByFullName mailboxes) names
-       in [FilterOpOR $ map (\m -> FilterValue $ Aeson.object ["inMailbox" .= m]) ids]
-
 
 data Config = Config
   { configMaildir :: Maildir,

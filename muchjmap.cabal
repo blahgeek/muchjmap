@@ -26,8 +26,8 @@ library
       MuchJMAP.App
       MuchJMAP.Config
       MuchJMAP.Download
+      MuchJMAP.Fetch
       MuchJMAP.Maildir
-      MuchJMAP.Pull
       Network.JMAP.API
       Network.JMAP.Core
       Network.JMAP.Echo
