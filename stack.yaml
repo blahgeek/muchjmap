@@ -41,6 +41,9 @@ packages:
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
 # extra-deps: []
+extra-deps:
+  - git: https://github.com/blahgeek/hs-notmuch.git
+    commit: 74bfd91f0d934825eb2f9334c6dd53d9ee965c77
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

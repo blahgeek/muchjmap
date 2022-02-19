@@ -56,6 +56,7 @@ library
     , hspec
     , http-conduit
     , mtl
+    , notmuch
     , text
     , yaml
   default-language: Haskell2010
@@ -89,6 +90,7 @@ executable muchjmap-exe
     , http-conduit
     , mtl
     , muchjmap
+    , notmuch
     , text
     , yaml
   default-language: Haskell2010
@@ -124,6 +126,7 @@ test-suite muchjmap-test
     , http-conduit
     , mtl
     , muchjmap
+    , notmuch
     , text
     , yaml
   default-language: Haskell2010

@@ -35,6 +35,7 @@ dependencies:
 - yaml
 - conduit
 - directory
+- notmuch
 
 default-extensions:
   - DeriveGeneric

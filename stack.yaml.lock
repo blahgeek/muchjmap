@@ -3,7 +3,18 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    git: https://github.com/blahgeek/hs-notmuch.git
+    name: notmuch
+    pantry-tree:
+      sha256: 39b85b336921efd3397ba07a726b502b72e70d2f12021fd702cc8b718c4aa4db
+      size: 1168
+    commit: 74bfd91f0d934825eb2f9334c6dd53d9ee965c77
+    version: 0.3.0.0
+  original:
+    git: https://github.com/blahgeek/hs-notmuch.git
+    commit: 74bfd91f0d934825eb2f9334c6dd53d9ee965c77
 snapshots:
 - completed:
     sha256: 8699812d2b2c1f83d6ad1261de9cf628ed36a1cfc14f19d67188e005e7a3a39d
