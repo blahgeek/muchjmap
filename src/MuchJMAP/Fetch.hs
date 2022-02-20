@@ -1,4 +1,4 @@
-module MuchJMAP.Fetch where
+module MuchJMAP.Fetch (fetchEmailsFull, fetchEmailsDelta, FetchState(..)) where
 
 import Control.Monad (when)
 import Control.Monad.Catch (Exception, MonadThrow, throwM, catch, MonadCatch)

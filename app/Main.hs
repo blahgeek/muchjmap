@@ -9,7 +9,6 @@ import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import MuchJMAP.Config (Config (..))
-import qualified MuchJMAP.App as App
 import qualified Network.JMAP.API as JMAPAPI
 import qualified Network.JMAP.Core as JMAPCore
 import qualified Network.JMAP.Mail as JMAPMail
@@ -19,6 +18,7 @@ import System.Log.Handler.Simple (verboseStreamHandler)
 import GHC.IO.Handle.FD (stderr)
 import System.Log.Formatter (simpleLogFormatter)
 import System.Log.Handler (LogHandler(setFormatter))
+import qualified MuchJMAP.App as App
 
 data ConfigPath = ConfigPath {configPath :: FilePath}
   deriving (Show, Data, Typeable)
@@ -35,7 +35,7 @@ main = do
   config_path <- cmdArgs configPathArg
   conf <- Yaml.decodeFileThrow $ configPath config_path
 
-  App.runApp conf
+  App.runPullFull conf
 
   -- let server_config = configServerConfig conf
   -- let email_filter = configEmailFilter conf

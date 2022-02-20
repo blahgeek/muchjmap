@@ -19,7 +19,6 @@ import Network.JMAP.Mail
     MailboxId (..),
     findMailboxByFullName,
   )
-import MuchJMAP.Maildir (Maildir, maildirPath)
 
 
 data EmailFilter = EmailFilter {emailFilterMailboxes :: Maybe [T.Text]}
@@ -30,7 +29,8 @@ instance Aeson.FromJSON EmailFilter where
 
 
 data Config = Config
-  { configMaildir :: Maildir,
+  { configNotmuchDir :: FilePath,
+    configNotmuchDataSubdir :: FilePath,
     configServerConfig :: ServerConfig,
     configEmailFilter :: EmailFilter
   }
@@ -39,6 +39,8 @@ data Config = Config
 instance Aeson.FromJSON Config where
   parseJSON = Aeson.genericParseJSON $ aesonOptionWithLabelPrefix "config"
 
+dataDir :: Config -> FilePath
+dataDir config = configNotmuchDir config </> configNotmuchDataSubdir config
 
-pullStateFilePath :: Config -> FilePath
-pullStateFilePath conf = maildirPath (configMaildir conf) </> ".muchjmap.pull_state.json"
+stateFilePath :: Config -> FilePath
+stateFilePath conf = dataDir conf </> ".muchjmap.state.json"
