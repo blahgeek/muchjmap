@@ -1,6 +1,6 @@
 module MuchJMAP.Download (emailFilename, downloadEmails) where
 
-import Control.Monad (forM_, forM, when)
+import Control.Monad (forM_, forM, when, unless)
 import Control.Monad.Catch (Exception, throwM, MonadCatch, catchAll)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Text as T
@@ -23,7 +23,7 @@ import Network.JMAP.API
 import Control.Concurrent (newQSem, newEmptyMVar, takeMVar, forkIO, waitQSem, signalQSem, putMVar)
 import Conduit (runResourceT)
 import Data.List (isSuffixOf)
-import System.Directory (createDirectoryIfMissing)
+import System.Directory (createDirectoryIfMissing, doesFileExist)
 
 
 infoM = Logger.infoM "Download"
@@ -45,15 +45,17 @@ emailFilename Email {emailId = EmailId id} = T.unpack id ++ kEmailFilenameSuffix
 
 doDownload :: RequestContext -> FilePath -> Email -> IO FilePath
 doDownload (config, session) dir email = do
-  infoM $ "Downloading email " ++ show (emailId email)
   let dest_path = dir </> emailFilename email
-  runResourceT $
-    downloadBlob
-      (config, session)
-      (getPrimaryAccount session MailCapability)
-      (emailBlobId email)
-      dest_path
-  infoM $ "Downloaded email " ++ show (emailId email) ++ " to " ++ dest_path
+  dest_path_exists <- doesFileExist dest_path
+  unless dest_path_exists $ do
+    infoM $ "Downloading email " ++ show (emailId email)
+    runResourceT $
+      downloadBlob
+        (config, session)
+        (getPrimaryAccount session MailCapability)
+        (emailBlobId email)
+        dest_path
+    infoM $ "Downloaded email " ++ show (emailId email) ++ " to " ++ dest_path
   return dest_path
 
 downloadEmails :: RequestContext -> FilePath -> [Email] -> IO ()
