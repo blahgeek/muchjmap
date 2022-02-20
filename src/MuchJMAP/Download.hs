@@ -1,4 +1,4 @@
-module MuchJMAP.Download (emailFilename, downloadEmails) where
+module MuchJMAP.Download (emailFilename, downloadEmails, emailIdFromFilePath) where
 
 import Control.Monad (forM_, forM, when, unless)
 import Control.Monad.Catch (Exception, throwM, MonadCatch, catchAll)
@@ -7,7 +7,7 @@ import qualified Data.Text as T
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified System.Log.Logger as Logger
-import System.FilePath ((</>))
+import System.FilePath ((</>), takeBaseName)
 
 import Network.JMAP.Mail
   ( Email(..) , EmailId (EmailId)
@@ -42,6 +42,9 @@ kEmailFilenameSuffix = ".eml"
 
 emailFilename :: Email -> FilePath
 emailFilename Email {emailId = EmailId id} = T.unpack id ++ kEmailFilenameSuffix
+
+emailIdFromFilePath :: FilePath -> EmailId
+emailIdFromFilePath = EmailId . T.pack . takeBaseName
 
 doDownload :: RequestContext -> FilePath -> Email -> IO FilePath
 doDownload (config, session) dir email = do

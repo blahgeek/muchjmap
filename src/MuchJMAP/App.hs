@@ -5,6 +5,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Error.Class (MonadError)
 import qualified Data.Aeson as Aeson
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import MuchJMAP.Config
 import MuchJMAP.Fetch
 import MuchJMAP.Download
@@ -12,10 +13,10 @@ import qualified Data.ByteString.Lazy.Char8 as C
 import Network.JMAP.Mail
   ( Email (..),
   )
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, removeFile)
 import System.FilePath ((</>), splitPath, addTrailingPathSeparator, isAbsolute)
 import qualified Notmuch
-import Control.Monad (forM, forM_)
+import Control.Monad (forM, forM_, when, mapM_)
 import Control.Monad.Except (ExceptT, runExceptT)
 import qualified System.Log.Logger as Logger
 
@@ -33,15 +34,26 @@ handleNotmuchError block = do
     Left err -> throwM $ NotmuchException err
     Right ret -> return ret
 
-indexFiles :: (MonadIO m, MonadThrow m) =>
-  Config ->
+
+deleteEmailsExcluding ::
+  (MonadIO m, MonadThrow m) =>
   Notmuch.Database Notmuch.RW ->
+  FilePath ->
   [Email] ->
   m ()
-indexFiles config db emails = forM_ emails $ \email -> do
-  let path = dataDir config </> emailFilename email
-  liftIO $ infoM $ "Adding email to notmuch: " ++ path
-  handleNotmuchError $ Notmuch.indexFile db path
+deleteEmailsExcluding db subdir emails =
+  Notmuch.query db (Notmuch.Path subdir)
+    >>= handleNotmuchError . Notmuch.messages
+    >>= mapM_
+      ( \msg -> do
+          msg_filename <- Notmuch.messageFilename msg
+          when (Set.notMember (emailIdFromFilePath msg_filename) email_ids) $ do
+            liftIO $ infoM $ "Deleting email from db: " ++ msg_filename
+            handleNotmuchError (Notmuch.removeFile db msg_filename)
+            liftIO $ removeFile msg_filename
+      )
+  where
+    email_ids = Set.fromList $ map emailId emails
 
 runPullFull :: (MonadIO m, MonadThrow m, MonadCatch m) =>
   Config -> m ()
@@ -53,8 +65,12 @@ runPullFull config = do
       (configServerConfig config, fetchStateSession fetch_state)
       (dataDir config)
       emails
+  deleteEmailsExcluding db (configNotmuchDataSubdir config) emails
+  forM_ emails $ \email -> do
+    let path = dataDir config </> emailFilename email
+    liftIO $ infoM $ "Adding email to db: " ++ path
+    handleNotmuchError $ Notmuch.indexFile db path
   liftIO $ C.writeFile (stateFilePath config) (Aeson.encode fetch_state)
-  indexFiles config db emails
 
 -- runApp :: (MonadIO m, MonadThrow m, MonadCatch m) => Config -> m ()
 -- runApp config = do
